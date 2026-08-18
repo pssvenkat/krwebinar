@@ -5,6 +5,7 @@ import { healthRouter } from './routes/health'
 import { tenantRoutes } from './routes/tenant'
 import { authRoutes } from './routes/auth'
 import { webinarAdminRoutes } from './routes/admin/webinars'
+import { registrationAdminRoutes } from './routes/admin/registrations'
 import { publicWebinarRoutes } from './routes/public/webinar'
 import { tenantMiddleware } from './middleware/tenant'
 import type { Env, HonoVariables } from './types'
@@ -56,6 +57,7 @@ app.route('/api', healthRouter)
 app.route('/api/v1/tenant', tenantRoutes)
 app.route('/api/v1/auth', authRoutes)
 app.route('/api/v1/admin/webinars', webinarAdminRoutes)
+app.route('/api/v1/admin/webinars', registrationAdminRoutes)
 
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)

@@ -163,6 +163,7 @@ export const api = {
 export interface WebinarSummary {
   id: string
   title: string
+  hostName: string
   startDate: string
   startTime: string
   endTime: string
@@ -174,7 +175,6 @@ export interface WebinarSummary {
 
 export interface WebinarDetail extends WebinarSummary {
   description: string | null
-  hostName: string
   youtubeVideoId: string | null
   createdAt: string
   updatedAt: string
@@ -183,11 +183,12 @@ export interface WebinarDetail extends WebinarSummary {
 export interface CreateWebinarInput {
   title: string
   description?: string
-  hostName?: string
+  hostName: string
   startDate: string
   startTime: string
   endTime: string
   timezone?: string
   youtubeVideoId?: string
   maxParticipants?: number
+  registrationOpen?: boolean
 }

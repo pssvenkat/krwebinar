@@ -1,18 +1,27 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 
 // Public pages
 import HomePage from './pages/public/HomePage'
 import NotFoundPage from './pages/public/NotFoundPage'
 
-// Admin pages (shell only — full implementation in Phase 5+)
+// Admin pages
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 
-// Phase 4: Registration flow (lazy-loaded — keeps initial bundle lean)
-const RegisterPage = lazy(() => import('./pages/public/RegisterPage'))
-const AttendPage = lazy(() => import('./pages/attend/AttendPage'))
-const FeedbackPage = lazy(() => import('./pages/public/FeedbackPage'))
+// Auth guard
+import RequireAuth from './components/RequireAuth'
+
+// Phase 4: Registration flow (lazy-loaded)
+const RegisterPage   = lazy(() => import('./pages/public/RegisterPage'))
+const AttendPage     = lazy(() => import('./pages/attend/AttendPage'))
+const FeedbackPage   = lazy(() => import('./pages/public/FeedbackPage'))
+
+// Phase 5: Admin pages (lazy-loaded)
+const AdminLoginPage        = lazy(() => import('./pages/admin/AdminLoginPage'))
+const AdminWebinarListPage  = lazy(() => import('./pages/admin/AdminWebinarListPage'))
+const AdminWebinarFormPage  = lazy(() => import('./pages/admin/AdminWebinarFormPage'))
+const AdminWebinarDetailPage = lazy(() => import('./pages/admin/AdminWebinarDetailPage'))
 
 // Dev pages
 import DesignSystemPage from './pages/dev/DesignSystemPage'
@@ -40,17 +49,29 @@ export default function App() {
           <Route path="/w/:token" element={<AttendPage />} />
           <Route path="/w/:token/feedback" element={<FeedbackPage />} />
 
-          {/* ── Admin routes ── */}
-          <Route path="/admin" element={<AdminLayout />}>
+          {/* ── Admin login (unguarded) ── */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+
+          {/* ── Admin routes (auth-guarded) ── */}
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <AdminLayout />
+              </RequireAuth>
+            }
+          >
             <Route index element={<AdminDashboard />} />
-            {/* Additional admin routes added in Phase 5+ */}
+            <Route path="webinars" element={<AdminWebinarListPage />} />
+            <Route path="webinars/new" element={<AdminWebinarFormPage />} />
+            <Route path="webinars/:id" element={<AdminWebinarDetailPage />} />
+            <Route path="webinars/:id/edit" element={<AdminWebinarFormPage />} />
           </Route>
 
-          {/* ── Dev routes (design system showcase) ── */}
+          {/* ── Dev routes ── */}
           <Route path="/design-system" element={<DesignSystemPage />} />
 
           {/* ── Fallbacks ── */}
-          <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
