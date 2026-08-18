@@ -5,9 +5,9 @@
 
 ---
 
-## Current Phase: PHASE 1 COMPLETE ✅
+## Current Phase: PHASE 2 COMPLETE ✅
 
-## Next Phase: PHASE 2 — Design System
+## Next Phase: PHASE 3 — Multi-Tenant Foundation
 
 ---
 
@@ -15,239 +15,184 @@
 
 | Item | Status |
 |---|---|
-| GitHub repo | Active — 2 commits on `main` |
+| GitHub repo | Active — 3 commits on `main` |
 | Local clone | `c:\Users\venka\.gemini\antigravity\scratch\kfwebinar` |
-| Framework | React 18 + Vite 5 + TypeScript 5 + Tailwind 3 |
-| Backend | Cloudflare Workers + Hono |
-| Node version | 24.16.0 |
-| npm version | 11.13.0 |
+| Last commit | `feat: add design system component library (Phase 2)` |
 
 ---
 
-## What Was Done in Phase 1
+## Phase 2 Summary — Design System
 
-### Project Foundation Created
+### Components Built (22 total)
 
-**Frontend:**
-- React 18 + Vite 5 + TypeScript (strict mode)
-- Tailwind CSS 3 with custom theme extension
-- React Router v6 — full route structure with placeholders
-- React Query v5 — server state management
-- Application shell: `App.tsx`, `HomePage`, `NotFoundPage`, `AdminLayout`, `AdminDashboard`
-- Google Fonts: Inter (body) + Nunito (headings) loaded in `index.html`
-- CSS design tokens — all colors, spacing, radius, shadows as CSS variables in `index.css`
-- Favicon (`public/favicon.svg`)
+All components live in `src/client/components/ui/` and are exported from `src/client/components/ui/index.ts`.
 
-**Backend:**
-- Cloudflare Workers entry point (`src/server/index.ts`) with Hono
-- `GET /api/health` endpoint returning `{ ok: true, data: { status, version, environment, timestamp } }`
-- Security headers middleware
-- Request logging middleware
-- CORS — origin-validated, dev-mode permissive
-- Worker types (`src/server/types.ts`) — Env bindings interface
+| File | Components |
+|---|---|
+| `Button.tsx` | `Button` — 6 variants, 3 sizes, loading, icons |
+| `Input.tsx` | `Input` — label, hint, error, icon slots |
+| `Select.tsx` | `Select` — accessible dropdown |
+| `Textarea.tsx` | `Textarea` — character count |
+| `Checkbox.tsx` | `Checkbox`, `Radio`, `RadioGroup` |
+| `PhoneInput.tsx` | `PhoneInput` — E.164, flag picker, as-you-type |
+| `CountrySelect.tsx` | `CountrySelect` — 249 countries, flag emoji |
+| `Card.tsx` | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` |
+| `Badge.tsx` | `Badge`, `WebinarStatusBadge` — 8 variants |
+| `Modal.tsx` | `Modal` — focus trap, scroll lock, 5 sizes |
+| `Drawer.tsx` | `Drawer` — left/right slide |
+| `Tabs.tsx` | `Tabs`, `TabList`, `Tab`, `TabPanel` — ARIA |
+| `Table.tsx` | `Table` — generic typed, sortable, loading |
+| `Pagination.tsx` | `Pagination` — smart ellipsis |
+| `Toast.tsx` | `ToastProvider`, `useToast` — auto-dismiss |
+| `Alert.tsx` | `Alert` — 4 semantic variants |
+| `Dropdown.tsx` | `Dropdown` — ARIA menu role |
+| `Avatar.tsx` | `Avatar` — image or initials fallback |
+| `States.tsx` | `EmptyState`, `LoadingState`, `ErrorState` |
+| `StarRating.tsx` | `StarRating` — keyboard nav, readonly |
+| `Progress.tsx` | `Progress` — 4 variants, animated |
+| `ThemePreview.tsx` | `ThemePreview` — full design token showcase |
 
-**Shared:**
-- `src/shared/types/index.ts` — all domain types (Tenant, User, Webinar, Participant, Realtime messages, API wrappers)
-- `src/shared/schemas/index.ts` — Zod schemas (registration, feedback, webinar)
-- `src/shared/constants/index.ts` — roles, status machines, rate limits, lead interests, default theme
+### Styles
+- `src/client/components.css` — ~400 lines, all values use `var(--color-*)` tokens
+- Imported in `src/client/main.tsx` (after `index.css`)
 
-**Durable Objects:**
-- `src/durable-objects/WebinarRoom.ts` — stub implementation with WebSocket handling and chat rate limiting
-
-**Database:**
-- `db/migrations/0001_initial_schema.sql` — tenants, tenant_branding, tenant_settings, users tables + demo Krave seed
-
-**Testing:**
-- Vitest configured in `vite.config.ts`
-- `src/shared/constants/constants.test.ts` — 6 tests
-- `src/shared/schemas/schemas.test.ts` — 18 tests (including international phone: IN, US, UK, UAE)
-- Playwright `playwright.config.ts` — desktop + mobile E2E
-- `tests/e2e/foundation.spec.ts` — 6 smoke tests
-
-**Tooling:**
-- ESLint 9 flat config (`eslint.config.js`) with TypeScript + React rules
-- Prettier (`.prettierrc`)
-- `.gitignore`, `.env.example`
-- `wrangler.toml` — D1, R2, Durable Objects bindings
+### Design System Page
+- Route: `/design-system`
+- File: `src/client/pages/dev/DesignSystemPage.tsx`
+- 4 tabs: Theme Showcase, Interactive (Modal/Drawer/Toast/Dropdown), Forms (PhoneInput/CountrySelect/StarRating), Data (Table/Pagination)
 
 ---
 
-## Verification Results (Phase 1)
+## Verification Results (Phase 2)
 
 | Check | Result |
 |---|---|
-| `npm install` | ✅ 566 packages installed |
 | `tsc --noEmit` | ✅ 0 errors |
 | `eslint` | ✅ 0 errors, 0 warnings |
-| `vitest run` | ✅ 24/24 tests pass |
-| `vite build` | ✅ Built in 10.4s, 85 modules |
+| `vitest run` | ✅ **57/57 tests pass** (3 files) |
+| `vite build` | ✅ 220 modules, 17.4s, 0 warnings |
+| `git push` | ✅ Pushed to `origin/main` |
 
 ---
 
-## Files Changed in Phase 1
+## All Files (Cumulative — Phases 0–2)
 
 ```
-package.json                              [NEW]
-tsconfig.json                             [NEW]
-tsconfig.worker.json                      [NEW]
-vite.config.ts                            [NEW]
-tailwind.config.ts                        [NEW]
-postcss.config.js                         [NEW]
-eslint.config.js                          [NEW]
-.prettierrc                               [NEW]
-.prettierignore                           [NEW]
-.gitignore                                [NEW]
-.env.example                              [NEW]
-wrangler.toml                             [NEW]
-playwright.config.ts                      [NEW]
-index.html                                [NEW]
-public/favicon.svg                        [NEW]
+Phase 0: docs/OVERVIEW.md, docs/ARCHITECTURE.md, docs/ROADMAP.md
 
-src/shared/types/index.ts                 [NEW]
-src/shared/schemas/index.ts               [NEW]
-src/shared/constants/index.ts             [NEW]
-src/shared/constants/constants.test.ts    [NEW]
-src/shared/schemas/schemas.test.ts        [NEW]
+Phase 1: package.json, tsconfig.json, tsconfig.worker.json, vite.config.ts,
+         tailwind.config.ts, postcss.config.js, eslint.config.js, wrangler.toml,
+         playwright.config.ts, index.html, public/favicon.svg, .env.example,
+         src/shared/types/index.ts, src/shared/schemas/index.ts,
+         src/shared/constants/index.ts, src/server/index.ts,
+         src/server/routes/health.ts, src/server/types.ts,
+         src/durable-objects/WebinarRoom.ts,
+         src/client/index.css, src/client/main.tsx, src/client/App.tsx,
+         src/client/pages/public/HomePage.tsx,
+         src/client/pages/public/NotFoundPage.tsx,
+         src/client/pages/admin/AdminLayout.tsx,
+         src/client/pages/admin/AdminDashboard.tsx,
+         db/migrations/0001_initial_schema.sql,
+         tests/e2e/foundation.spec.ts
 
-src/server/index.ts                       [NEW]
-src/server/types.ts                       [NEW]
-src/server/routes/health.ts               [NEW]
-
-src/durable-objects/WebinarRoom.ts        [NEW]
-
-src/client/index.css                      [NEW]
-src/client/main.tsx                       [NEW]
-src/client/App.tsx                        [NEW]
-src/client/test-setup.ts                  [NEW]
-src/client/pages/public/HomePage.tsx      [NEW]
-src/client/pages/public/NotFoundPage.tsx  [NEW]
-src/client/pages/admin/AdminLayout.tsx    [NEW]
-src/client/pages/admin/AdminDashboard.tsx [NEW]
-
-db/migrations/0001_initial_schema.sql     [NEW]
-tests/e2e/foundation.spec.ts              [NEW]
-```
-
----
-
-## Migrations
-
-| Migration | Tables Created |
-|---|---|
-| `0001_initial_schema.sql` | `tenants`, `tenant_branding`, `tenant_settings`, `users` |
-
-Demo seed data: Krave Microgreens tenant (`slug: krave`)
-
-To run locally (after creating D1 database):
-```bash
-wrangler d1 create krwebinar-db
-# Update database_id in wrangler.toml
-wrangler d1 execute krwebinar-db --local --file=db/migrations/0001_initial_schema.sql
+Phase 2: src/client/components.css,
+         src/client/components/ui/Button.tsx,
+         src/client/components/ui/Input.tsx,
+         src/client/components/ui/Select.tsx,
+         src/client/components/ui/Textarea.tsx,
+         src/client/components/ui/Checkbox.tsx,
+         src/client/components/ui/PhoneInput.tsx,
+         src/client/components/ui/CountrySelect.tsx,
+         src/client/components/ui/Card.tsx,
+         src/client/components/ui/Badge.tsx,
+         src/client/components/ui/Modal.tsx,
+         src/client/components/ui/Drawer.tsx,
+         src/client/components/ui/Tabs.tsx,
+         src/client/components/ui/Table.tsx,
+         src/client/components/ui/Pagination.tsx,
+         src/client/components/ui/Toast.tsx,
+         src/client/components/ui/Alert.tsx,
+         src/client/components/ui/Dropdown.tsx,
+         src/client/components/ui/Avatar.tsx,
+         src/client/components/ui/States.tsx,
+         src/client/components/ui/StarRating.tsx,
+         src/client/components/ui/Progress.tsx,
+         src/client/components/ui/ThemePreview.tsx,
+         src/client/components/ui/index.ts,
+         src/client/components/ui/components.test.tsx,
+         src/client/pages/dev/DesignSystemPage.tsx
 ```
 
 ---
 
-## Design Token System (in src/client/index.css)
-
-All colors are CSS custom properties — vendor-overridable at runtime:
-
-| Token | Demo Value | Usage |
-|---|---|---|
-| `--color-primary` | `#1a4731` | Buttons, links, accents |
-| `--color-secondary` | `#2d7a3a` | Secondary actions |
-| `--color-accent` | `#f5a623` | CTAs, highlights |
-| `--color-background` | `#faf9f6` | Page background |
-| `--color-surface` | `#ffffff` | Card backgrounds |
-| `--color-text` | `#1c2b1e` | Primary text |
-| `--color-muted` | `#6b7c6e` | Secondary text |
-| `--color-border` | `#e2e8e4` | Borders |
-
-Vendor override mechanism: `[data-theme="vendor"]` attribute reads from `--vendor-color-*` variables, allowing runtime theme injection from D1 branding data.
-
----
-
-## Known Issues / Open Questions
-
-1. **Cloudflare account** — D1 database ID is a placeholder in `wrangler.toml`. Must run `wrangler d1 create krwebinar-db` and update the ID before deploying.
-2. **npm audit** — 13 vulnerabilities (6 moderate, 5 high, 2 critical). These are in dev/build tooling (Playwright, Wrangler transitive deps), not production runtime. Will address in Phase 21 security hardening.
-3. **E2E tests** — Playwright smoke tests require a running dev server. Not run in Phase 1 CI (would need `npm run dev` + `npm run dev:worker` running simultaneously).
-4. **Worker typecheck** — `tsconfig.worker.json` is separate and not run by default `tsc`. Run with: `npx tsc --noEmit -p tsconfig.worker.json`
-
----
-
-## Commands to Run
-
-```bash
-# Development
-npm run dev          # Start Vite dev server (localhost:5173)
-npm run dev:worker   # Start Wrangler dev server (localhost:8787)
-
-# Quality checks
-npm run typecheck    # TypeScript check (client + shared)
-npm run lint         # ESLint
-npm run format       # Prettier format
-npm test             # Vitest unit tests
-npm run test:e2e     # Playwright E2E (needs dev servers running)
-
-# Build
-npm run build        # Production build → dist/client/
-
-# Database (after Cloudflare setup)
-wrangler d1 create krwebinar-db
-wrangler r2 bucket create krwebinar-assets
-wrangler d1 execute krwebinar-db --local --file=db/migrations/0001_initial_schema.sql
-```
-
----
-
-## Environment Variables Needed
-
-```
-# .dev.vars (local only, never commit)
-JWT_SECRET=local-dev-secret-min-32-chars-xxxxxxxxx
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
-
-# .env.local (local only)
-VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
-```
-
----
-
-## Next Phase Instructions (Phase 2 — Design System)
+## Next Phase Instructions — Phase 3: Multi-Tenant Foundation
 
 ### Goal
-Build the complete UI component library using the KraveFresh-inspired design system established in Phase 1.
+Build the core multi-tenant API layer — every request is tenant-scoped from the Worker edge.
 
-### Components to Build
-- **Primitives:** Button (variants: primary, secondary, ghost, danger; sizes: sm, md, lg), Input, Select, Textarea, Checkbox, Radio
-- **International:** PhoneInput (with country code picker), CountrySelect
-- **Feedback:** Toast, Alert, Badge, Progress, StarRating
-- **Layout:** Card, Modal, Drawer, Tabs, Dropdown, Avatar
-- **Data:** Table, Pagination
-- **States:** EmptyState, LoadingState, ErrorState
-- **Preview:** ThemePreview (shows all tokens applied)
+### D1 Schema Additions
+- `webinars` table (references tenants)
+- `webinar_registrations` table
+- `lead_captures` table
+- `consent_records` table (DPDP/GDPR)
+
+Migration file: `db/migrations/0002_webinars.sql`
+
+### Worker API Routes (Hono)
+All routes under `/api/v1/` — tenant resolved from:
+1. Custom domain → `Host` header lookup in D1
+2. Subdomain → `{slug}.platform.com`
+3. Dev fallback → `X-Tenant-Slug` header
+
+```
+GET  /api/v1/tenant              → Public tenant branding + settings
+POST /api/v1/auth/login          → Vendor admin login (JWT)
+GET  /api/v1/auth/me             → Current user profile
+POST /api/v1/auth/refresh        → Refresh JWT
+GET  /api/v1/admin/webinars      → List webinars (tenant-scoped)
+POST /api/v1/admin/webinars      → Create webinar
+GET  /api/v1/admin/webinars/:id  → Get webinar detail
+PUT  /api/v1/admin/webinars/:id  → Update webinar
+```
+
+### Server Files to Create
+- `src/server/middleware/tenant.ts` — resolve tenant from request
+- `src/server/middleware/auth.ts` — JWT verify + RBAC
+- `src/server/routes/tenant.ts` — public tenant endpoint
+- `src/server/routes/auth.ts` — login/refresh
+- `src/server/routes/admin/webinars.ts` — CRUD
+- `src/server/lib/jwt.ts` — sign/verify with Web Crypto API (no npm deps)
+- `src/server/lib/password.ts` — bcrypt-compatible hashing via Web Crypto
+
+### Client Files to Create
+- `src/client/lib/api.ts` — typed fetch wrapper with auth token injection
+- `src/client/hooks/useTenant.ts` — React Query tenant hook
+- `src/client/contexts/AuthContext.tsx` — JWT auth state
+- `src/client/hooks/useAuth.ts` — login/logout/refresh
+
+### Tests to Add
+- Worker route unit tests (Vitest + Miniflare)
+- Tenant resolution middleware tests
+- JWT sign/verify tests
 
 ### Rules
-- All components use `var(--color-*)` — never hex values
-- All components fully accessible (keyboard, screen reader)
-- All components responsive
-- Storybook-style demo page at `/design-system` (dev only)
-
-### Files to Create
-- `src/client/components/ui/` — all primitive components
-- `src/client/pages/dev/DesignSystemPage.tsx` — component showcase
+- ALL database queries must include `WHERE tenant_id = ?` — never bare queries
+- JWT contains `{ sub: userId, tenantId, role, iat, exp }`
+- Tokens expire in 15 minutes; refresh tokens in 7 days (httpOnly cookie)
+- No PLATFORM_OWNER routes yet — Phase 3 is vendor-only admin
 
 ---
 
-## Git Commits Made
+## Commands
 
-```
-chore: initialize webinar platform documentation (Phase 0)
-feat: add project foundation (Phase 1)
+```bash
+npm run dev          # Vite dev server → localhost:5173
+npm run dev:worker   # Wrangler → localhost:8787
+npm test             # 57 unit tests
+npm run build        # Production build
 ```
 
 ---
 
-*Last updated: Phase 1 complete*
-*Session: 1*
-*Awaiting approval to proceed with Phase 2*
+*Last updated: Phase 2 complete*
+*Awaiting approval to proceed with Phase 3*
