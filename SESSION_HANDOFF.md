@@ -5,9 +5,9 @@
 
 ---
 
-## Current Phase: PHASE 5 COMPLETE ✅
+## Current Phase: PHASE 6 COMPLETE ✅
 
-## Next Phase: PHASE 6 — Email Notifications + Cloudflare Workers Cron
+## Next Phase: PHASE 7 — Cloudflare Deployment + Production Config
 
 ---
 
@@ -15,164 +15,171 @@
 
 | Item | Status |
 |---|---|
-| GitHub repo | Active — 9 commits on `main` |
+| GitHub repo | Active — 11 commits on `main` |
 | Local clone | `c:\Users\venka\.gemini\antigravity\scratch\kfwebinar` |
-| Last commit | `feat: admin dashboard and webinar management UI (Phase 5)` |
+| Last commit | `feat: email notifications + unsubscribe + cron reminders (Phase 6)` — `afc2eef` |
 
 ---
 
-## Phase 5 Summary — Admin Dashboard + Webinar Management UI
+## Phase 6 Summary — Email Notifications
 
-### New Server Route
-- **`GET /api/v1/admin/webinars/:id/registrations`** — auth-guarded, returns registration list for a webinar (tenant-scoped)
-  - File: `src/server/routes/admin/registrations.ts`
+### New Files
 
-### New Client Hooks (`src/client/hooks/useWebinars.ts`)
-- `useWebinars(filter)` — paginated list with status filter
-- `useWebinar(id)` — single webinar detail
-- `useRegistrations(webinarId)` — registration list for a webinar
-- `useCreateWebinar()` — creates webinar, invalidates list cache
-- `useUpdateWebinar(id)` — updates webinar, updates cache
-- `usePublishWebinar()` — DRAFT → PUBLISHED
-- `useGoLiveWebinar()` — PUBLISHED → LIVE
-- `useEndWebinar()` — LIVE → ENDED
-- `useArchiveWebinar()` — ENDED → ARCHIVED
+| File | Purpose |
+|---|---|
+| `src/server/lib/email-templates.ts` | 5 HTML + plain-text template builders |
+| `src/server/lib/email.ts` | MailChannels sender, dev stub, 5 send functions |
+| `src/server/routes/public/unsubscribe.ts` | GET (HTML confirm page) + POST (DPDP one-click) |
+| `src/server/scheduler.ts` | `scheduled` cron handler — 30-min pre-webinar reminders |
+| `db/migrations/0006_email_opt_out.sql` | `email_opt_out` column + index on `webinar_registrations` |
+| `src/server/lib/email-templates.test.ts` | 18 unit tests for all template builders |
 
-### New Client Components
-- **`RequireAuth`** (`src/client/components/RequireAuth.tsx`) — wraps `/admin/*`, spinner during session restore, redirects to `/admin/login`
+### Email Events
 
-### New Admin Pages (lazy-loaded)
-
-| File | Route | Description |
+| Trigger | Function | Recipients |
 |---|---|---|
-| `AdminLoginPage.tsx` | `/admin/login` | Email+password, error state, redirect on success |
-| `AdminDashboard.tsx` | `/admin` | Stat cards (total/live/upcoming/ended), upcoming webinar cards, New Webinar CTA |
-| `AdminWebinarListPage.tsx` | `/admin/webinars` | Status tab filter, table with inline Publish/Go Live/End/Archive/Edit action buttons |
-| `AdminWebinarFormPage.tsx` | `/admin/webinars/new`, `/admin/webinars/:id/edit` | Create + edit form (title, description, host, date, time, timezone, YouTube ID, capacity, registration toggle), guards against editing LIVE/ENDED |
-| `AdminWebinarDetailPage.tsx` | `/admin/webinars/:id` | Status machine controls, registration/attend URL display, registration table with CSV export |
+| Registration confirmed | `sendConfirmationEmail` | Attendee (attend URL + calendar) |
+| Webinar goes LIVE | `sendLiveNotifications` | All non-attended registrants |
+| 30 min before start (cron) | `sendReminderEmails` | All registrants (opt-in only) |
+| Webinar ENDED | `sendFeedbackRequests` | Attended only (feedback URL) |
+| New registration | `sendVendorAlert` | Vendor admin (new signup summary) |
 
-### CSS
-- `src/client/admin.css` — full admin UI: login card, stat cards, webinar card grid, tabs, data table, status controls, detail grid, form sections
+### Infrastructure Changes
+- `wrangler.toml` — added `[triggers] crons = ["*/15 * * * *"]`
+- `server/index.ts` — mounted `/api/v1/unsubscribe`, exported `scheduled`
+- `server/types.ts` — added `email_opt_out: number` to `DbRegistration`
+- Registration route — promoted stub → real `sendConfirmationEmail` via `waitUntil`
 
-### Client Type Updates (`src/client/lib/api.ts`)
-- `WebinarSummary` — added `hostName`
-- `CreateWebinarInput` — `hostName` now required; added `registrationOpen?`
-- `WebinarDetail` — extends `WebinarSummary` (hostName inherited)
+### DPDP Compliance
+- `email_opt_out = 1` is immutable once set
+- All emails include unsubscribe link keyed by `access_token`
+- `GET /api/v1/unsubscribe/:token` renders confirmation HTML (RFC 8058 one-click)
+- `POST /api/v1/unsubscribe/:token` for `List-Unsubscribe: <https://...>` header support
 
 ---
 
-## Verification Results (Phase 5)
+## Verification Results (Phase 6)
 
 | Check | Result |
 |---|---|
 | `tsc --noEmit` | ✅ 0 errors |
 | `eslint` | ✅ 0 errors, 0 warnings |
-| `vitest run` | ✅ **87/87 tests** (7 files) |
-| `vite build` | ✅ 246 modules, 4 new admin lazy chunks |
-| `git push` | ✅ Committed and pushed |
+| `vitest run` | ✅ **105/105 tests** (8 files, +18 new) |
+| `vite build` | ✅ 246 modules, 0 errors |
+| `git push` | ✅ `afc2eef` |
 
 ---
 
-## Next Phase Instructions — Phase 6: Email Notifications
+## Next Phase Instructions — Phase 7: Cloudflare Deployment + Production Config
 
 ### Goal
-Send automated emails for registration confirmations and webinar reminders. All at $0 cost using Cloudflare Email Workers.
+Deploy the Worker to Cloudflare, provision D1, wire secrets, configure custom domain and DNS.
 
-### Email Events to Handle
+### Steps
 
-| Trigger | Recipient | Template |
-|---|---|---|
-| Successful registration | Attendee | Confirmation + attend link + calendar add |
-| Webinar goes LIVE | All registered attendees | "Your webinar is starting!" + attend link |
-| 30-min reminder before start | All registered attendees | Reminder + attend link |
-| Webinar ENDED | All attended | Feedback link |
-| New registration | Vendor admin | "New registration for [webinar]" notification |
+#### 1. Provision Cloudflare Resources
 
-### Architecture — Cloudflare Email Workers
+```bash
+# Create D1 database
+wrangler d1 create krwebinar-db
+# → Paste the database_id into wrangler.toml [d1_databases]
 
-Use **Cloudflare Email Workers** (send via `MailChannels` free tier or direct SMTP):
+# Create R2 bucket
+wrangler r2 bucket create krwebinar-assets
 
-```toml
-# wrangler.toml addition
-[send_email]
-name = "EMAIL"
+# Run migrations
+wrangler d1 migrations apply krwebinar-db
 ```
 
-```typescript
-// Worker: send email via MailChannels
-await env.EMAIL.send({
-  to: [{ email: 'attendee@example.com', name: 'Priya Sharma' }],
-  from: { email: 'noreply@yourdomain.com', name: 'Krave Webinars' },
-  subject: 'Your spot is confirmed!',
-  content: [{ type: 'text/html', value: htmlTemplate }],
-})
+#### 2. Set Secrets
+
+```bash
+wrangler secret put JWT_SECRET
+wrangler secret put REFRESH_TOKEN_SECRET
+wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-### New Files
+#### 3. Seed Initial Tenant + Admin
 
-#### `src/server/lib/email.ts`
-- `sendConfirmationEmail(env, registration, webinar, tenant)` — confirmation + attend URL + calendar links
-- `sendLiveNotification(env, registrations[], webinar, tenant)` — "going live now"
-- `sendReminderEmail(env, registrations[], webinar, tenant)` — 30-min reminder
-- `sendFeedbackRequest(env, registrations[], webinar, tenant)` — post-webinar feedback link
-- `sendVendorNotification(env, registration, webinar, tenant)` — admin "new signup" alert
-- HTML email templates with inline styles (mobile-first, DPDP-compliant unsubscribe footer)
+Create `db/seeds/001_initial_tenant.sql`:
+- Insert tenant row for `krave` slug
+- Insert tenant_branding with green palette
+- Insert tenant_settings with defaults
+- Insert first admin user (hashed password — use `scripts/hash-password.ts`)
 
-#### `src/server/lib/email-templates.ts`
-- All HTML template builders — one function per email type
-- Shared layout wrapper (header, body, footer with unsubscribe)
-- Plain-text fallback for each template
+Create `scripts/hash-password.ts` — standalone script using the same PBKDF2 function.
 
-#### Cron Trigger — Reminder Emails
-```toml
-# wrangler.toml
-[triggers]
-crons = ["*/15 * * * *"]  # every 15 min
+#### 4. Deploy
+
+```bash
+npm run build        # vite build
+wrangler deploy      # deploys Worker + static assets
 ```
 
-```typescript
-// In worker: scheduled handler
-export async function scheduled(event, env, ctx) {
-  // Find webinars starting in ~30 min → send reminder
-  const upcoming = await getWebinarsStartingSoon(env.DB)
-  for (const webinar of upcoming) {
-    const regs = await getRegistrations(env.DB, webinar.id)
-    await sendReminderEmail(env, regs, webinar, ...)
-  }
-}
-```
+#### 5. Custom Domain
 
-#### Integration Points
-- **Registration route** (`routes/public/webinar.ts`): after successful `createRegistration`, call `sendConfirmationEmail` (already has `console.warn` stub at Phase 7 note — promote to Phase 6)
-- **Webinar status transitions** (`routes/admin/webinars.ts`): on `LIVE` transition, call `sendLiveNotification`; on `ENDED`, call `sendFeedbackRequest`
+In Cloudflare dashboard:
+- Workers & Pages → krwebinar → Settings → Domains & Routes
+- Add `webinar.kravemicrogreens.in` (or chosen domain)
+- Set `X-Tenant-Slug` header via Transform Rule for the custom domain
 
-### New DB Helpers
-- `getRegistrationsForWebinar(db, webinarId)` — all regs for notification bulk send
-- `getWebinarsStartingSoon(db, windowMinutes)` — webinars starting within N minutes for cron
+#### 6. Turnstile Widget
 
-### DPDP Compliance
-- All emails include unsubscribe link: `GET /api/v1/unsubscribe/:token`
-- Unsubscribe sets `email_opt_out = 1` on `webinar_registrations`
-- New route: `POST /api/v1/unsubscribe/:token` — one-click unsubscribe
-- Confirmation emails: explicit "You requested this email" consent notice
+- Register a Turnstile site for the registration page domain
+- Update `TURNSTILE_SITE_KEY` in client env
+- Wire widget into `RegisterPage.tsx` (Phase 4 placeholder already exists)
 
-### Tests
-- Unit test `sendConfirmationEmail` with mock `env.EMAIL`
-- Unit test each HTML template builder (snapshot or assertion-based)
-- Integration test unsubscribe route
+#### 7. Email Domain
+
+- Add DNS records for MailChannels DKIM (`_dmarc`, `_domainkey`)
+- Test with `wrangler email send` dry run
+
+#### 8. Smoke Tests
+
+- Register a real test attendee via the public form
+- Verify confirmation email arrives
+- Go Live → verify live notification email
+- Cron test: use `wrangler dev` → `curl -X POST /cdn-cgi/handler/scheduled?cron=...`
+- Unsubscribe link from email → verify HTML page + DB row
+
+#### Files to Create/Modify
+
+| File | Action |
+|---|---|
+| `wrangler.toml` | Update `database_id` after `d1 create` |
+| `db/seeds/001_initial_tenant.sql` | Initial tenant + admin seed |
+| `scripts/hash-password.ts` | PBKDF2 hash utility for seeding |
+| `src/client/pages/public/RegisterPage.tsx` | Wire Turnstile widget (replace `TURNSTILE_SITE_KEY` placeholder) |
+| `README.md` | Full deployment guide |
 
 ---
+
+## Cumulative Test Suite
+
+```
+8 test files | 105 tests
+  ✓ email-templates.test.ts   18 tests  (Phase 6)
+  ✓ webinar.test.ts           13 tests  (Phase 4)
+  ✓ schemas.test.ts           18 tests  (Phase 1)
+  ✓ components.test.tsx       33 tests  (Phase 2)
+  ✓ jwt.test.ts               10 tests  (Phase 1)
+  ✓ password.test.ts           4 tests  (Phase 1)
+  ✓ db.test.ts                 3 tests  (Phase 2)
+  ✓ constants.test.ts          6 tests  (Phase 1)
+```
 
 ## Cumulative Commands
 
 ```bash
 npm run dev          # Vite dev server → localhost:5173
 npm run dev:worker   # Wrangler → localhost:8787
-npm test             # 87 unit tests (7 files)
+npm test             # 105 unit tests (8 files)
 npm run build        # Production build
+wrangler deploy      # Deploy to Cloudflare (after secrets set)
+wrangler d1 migrations apply krwebinar-db   # Run DB migrations
 ```
 
 ---
 
-*Last updated: Phase 5 complete*
-*Awaiting approval to proceed with Phase 6*
+*Last updated: Phase 6 complete*
+*Awaiting approval to proceed with Phase 7*
