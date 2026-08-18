@@ -1,0 +1,262 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────
+   DESIGN TOKENS — KraveFresh Demo Theme (default)
+   All colors are CSS custom properties so vendors can override them.
+   Never hard-code hex values in components — always use var(--color-*)
+   ───────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Brand colors */
+  --color-primary: #1a4731;
+  --color-primary-hover: #15392a;
+  --color-primary-light: #f0f7f4;
+  --color-secondary: #2d7a3a;
+  --color-secondary-hover: #256631;
+  --color-accent: #f5a623;
+  --color-accent-hover: #e09518;
+  --color-accent-light: #fdf3e0;
+
+  /* Surfaces */
+  --color-background: #faf9f6;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-muted: #f4f6f5;
+
+  /* Text */
+  --color-text: #1c2b1e;
+  --color-text-secondary: #3d4f40;
+  --color-muted: #6b7c6e;
+  --color-placeholder: #9dada0;
+  --color-inverse: #ffffff;
+
+  /* Borders */
+  --color-border: #e2e8e4;
+  --color-border-strong: #c4cfc7;
+  --color-border-focus: #1a4731;
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-success-bg: #f0fdf4;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-error: #ef4444;
+  --color-error-bg: #fef2f2;
+  --color-info: #3b82f6;
+  --color-info-bg: #eff6ff;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Nunito', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Font sizes */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  --text-5xl: 3rem;      /* 48px */
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Border radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(26, 71, 49, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(26, 71, 49, 0.06), 0 1px 2px -1px rgba(26, 71, 49, 0.06);
+  --shadow-md: 0 4px 16px 0 rgba(26, 71, 49, 0.08), 0 2px 4px -1px rgba(26, 71, 49, 0.06);
+  --shadow-lg: 0 8px 32px 0 rgba(26, 71, 49, 0.10);
+  --shadow-xl: 0 20px 60px 0 rgba(26, 71, 49, 0.16);
+  --shadow-focus: 0 0 0 3px rgba(26, 71, 49, 0.20);
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 350ms ease;
+
+  /* Z-index layers */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   BASE RESET & GLOBAL STYLES
+   ───────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  min-height: 100vh;
+}
+
+/* Typography reset */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+  margin: 0;
+}
+
+p { margin: 0; }
+a { color: var(--color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img, svg { display: block; max-width: 100%; }
+button, input, select, textarea { font-family: inherit; }
+
+/* Focus visible — keyboard-only focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SCROLLBAR (subtle, on-brand)
+   ───────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+/* ─────────────────────────────────────────────────────────────────
+   LAYOUT UTILITIES
+   ───────────────────────────────────────────────────────────────── */
+
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: var(--space-6);
+}
+
+@media (max-width: 640px) {
+  .container { padding-inline: var(--space-4); }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   VENDOR THEME OVERRIDE SUPPORT
+   Vendors can inject a <style> tag or set these vars on :root
+   The platform reads tenant branding from the API and applies below.
+   ───────────────────────────────────────────────────────────────── */
+
+[data-theme="vendor"] {
+  /* These vars are populated dynamically from the vendor's branding config */
+  --color-primary: var(--vendor-color-primary, #1a4731);
+  --color-secondary: var(--vendor-color-secondary, #2d7a3a);
+  --color-accent: var(--vendor-color-accent, #f5a623);
+  --color-background: var(--vendor-color-background, #faf9f6);
+  --color-surface: var(--vendor-color-surface, #ffffff);
+  --color-text: var(--vendor-color-text, #1c2b1e);
+  --color-muted: var(--vendor-color-muted, #6b7c6e);
+  --color-border: var(--vendor-color-border, #e2e8e4);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   ANIMATION UTILITIES
+   ───────────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in { animation: fadeIn var(--transition-base) ease-out; }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+.animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* ─────────────────────────────────────────────────────────────────
+   LOADING SKELETON
+   ───────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 25%,
+    var(--color-surface) 50%,
+    var(--color-surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}

@@ -1,0 +1,44 @@
+name = "krwebinar"
+main = "src/server/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve static assets from dist/client
+[assets]
+directory = "./dist/client"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "krwebinar-db"
+database_id = "placeholder-update-after-creation"
+migrations_dir = "db/migrations"
+
+# R2 Bucket for assets (logos, favicons)
+[[r2_buckets]]
+binding = "ASSETS_BUCKET"
+bucket_name = "krwebinar-assets"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "WEBINAR_ROOM"
+class_name = "WebinarRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WebinarRoom"]
+
+# Environment variables (non-secret)
+[vars]
+ENVIRONMENT = "development"
+PLATFORM_NAME = "WebinarPlatform"
+
+# Development environment overrides
+[env.development]
+[env.development.vars]
+ENVIRONMENT = "development"
+
+# Production environment overrides
+[env.production]
+[env.production.vars]
+ENVIRONMENT = "production"
