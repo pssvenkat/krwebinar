@@ -5,9 +5,9 @@
 
 ---
 
-## Current Phase: PHASE 3 COMPLETE ✅
+## Current Phase: PHASE 4 COMPLETE ✅
 
-## Next Phase: PHASE 4 — Public Registration Flow
+## Next Phase: PHASE 5 — Admin Dashboard + Webinar Management UI
 
 ---
 
@@ -15,136 +15,134 @@
 
 | Item | Status |
 |---|---|
-| GitHub repo | Active — 5 commits on `main` |
+| GitHub repo | Active — 7 commits on `main` |
 | Local clone | `c:\Users\venka\.gemini\antigravity\scratch\kfwebinar` |
-| Last commit | `feat: add multi-tenant API foundation (Phase 3)` — `64290a0` |
+| Last commit | `feat: public registration flow (Phase 4)` |
 
 ---
 
-## Phase 3 Summary — Multi-Tenant API Foundation
+## Phase 4 Summary — Public Registration Flow
 
-### D1 Migration Added
-`db/migrations/0002_webinars.sql` — 5 new tables:
-- `webinars` — tenant-scoped, status: DRAFT→PUBLISHED→LIVE→ENDED→ARCHIVED
-- `webinar_registrations` — participant rows, unique `access_token` for /w/:token access
-- `lead_captures` — post-webinar interest signals
-- `consent_records` — **immutable** DPDP/GDPR audit trail (insert-only)
-- `refresh_tokens` — JWT refresh token rotation with revocation
+### New DB Helpers (`src/server/lib/db.ts`)
+- `getPublicWebinar` — only PUBLISHED/LIVE
+- `countRegistrations` — capacity check
+- `findExistingRegistration` — duplicate/idempotency check
+- `findRegistrationByToken` — attend route auth
+- `createRegistration` — inserts with ULID + 48-byte access_token
+- `createLeadCapture` — post-webinar interest + rating
+- `createConsentRecord` — **immutable** DPDP/GDPR insert-only audit trail
+- `markAttended` — first access during LIVE
+- `countFeedbackForRegistration` — duplicate feedback guard
 
-### Server Library (`src/server/lib/`)
+### New Server Routes (`src/server/routes/public/webinar.ts`)
 
-| File | Purpose |
+| Route | Auth | Description |
+|---|---|---|
+| `GET /api/v1/webinars/:id/public` | None | Public webinar info + spot count |
+| `POST /api/v1/webinars/:id/register` | None | Register (Turnstile in prod, idempotent, DPDP consent) |
+| `GET /api/v1/attend/:token` | Token | Reveal YouTube ID to registered attendees, mark attended |
+| `POST /api/v1/webinars/:id/feedback` | Token | Lead capture + star rating + contact consent |
+
+### New Client Pages (lazy-loaded)
+
+| File | Route | Description |
+|---|---|---|
+| `RegisterPage.tsx` | `/register/:webinarId` | Webinar hero + form + success + calendar links |
+| `AttendPage.tsx` | `/w/:token` | Waiting room → Live YouTube embed → Ended replay + feedback CTA |
+| `FeedbackPage.tsx` | `/w/:token/feedback` | Star rating + suggestions + interest checkboxes + contact consent |
+
+### Client Utilities
+- `src/client/lib/calendar.ts` — Google Calendar URL, ICS download, Outlook Web URL
+- `src/client/contexts/AuthContext.tsx` — JWT auth state + silent refresh
+- `src/client/hooks/useTenant.ts` — Tenant branding → CSS vars
+
+### Tests (87 total, 7 files)
+
+| File | Tests |
 |---|---|
-| `jwt.ts` | HMAC-SHA256 JWT sign/verify, `generateSecureToken`, `hashToken` — Web Crypto, zero deps |
-| `password.ts` | PBKDF2-SHA256 hash/verify (100k iterations, 16-byte salt) — constant-time compare |
-| `db.ts` | Typed D1 queries + ULID generator — ALL queries require `tenant_id` |
-
-### Server Middleware (`src/server/middleware/`)
-
-| File | Purpose |
-|---|---|
-| `tenant.ts` | Resolves tenant from X-Tenant-Slug header → subdomain → custom domain. Sets `c.get('tenant')` |
-| `auth.ts` | `requireAuth()` — verifies Bearer JWT, blocks cross-tenant tokens. `requireRole()` — RBAC |
-
-### Server Routes (`src/server/routes/`)
-
-| Route | Method | Auth | Description |
-|---|---|---|---|
-| `/api/v1/tenant` | GET | None | Public branding + settings |
-| `/api/v1/auth/login` | POST | None | email+password → access token + httpOnly refresh cookie |
-| `/api/v1/auth/refresh` | POST | Cookie | Rotate refresh token → new access token |
-| `/api/v1/auth/logout` | POST | Cookie | Revoke refresh token, clear cookie |
-| `/api/v1/auth/me` | GET | Bearer | Current user profile |
-| `/api/v1/admin/webinars` | GET | Bearer | List with pagination + status filter |
-| `/api/v1/admin/webinars` | POST | Bearer | Create webinar |
-| `/api/v1/admin/webinars/:id` | GET | Bearer | Get one |
-| `/api/v1/admin/webinars/:id` | PUT | Bearer | Update (blocked for LIVE/ENDED) |
-| `/api/v1/admin/webinars/:id` | DELETE | VENDOR_ADMIN | Archive |
-| `/api/v1/admin/webinars/:id/publish` | POST | Bearer | DRAFT → PUBLISHED |
-| `/api/v1/admin/webinars/:id/go-live` | POST | Bearer | PUBLISHED → LIVE |
-| `/api/v1/admin/webinars/:id/end` | POST | Bearer | LIVE → ENDED |
-
-### Client (`src/client/`)
-
-| File | Purpose |
-|---|---|
-| `lib/api.ts` | Typed fetch wrapper — in-memory token, silent refresh on 401, X-Tenant-Slug dev header |
-| `contexts/AuthContext.tsx` | Login/logout state, session restore on mount via silent refresh |
-| `hooks/useAuth.ts` | Convenience re-export of `useAuthContext` |
-| `hooks/useTenant.ts` | React Query tenant hook — fetches branding, applies CSS vars to document root |
-
-### Security Architecture
-- Access tokens: **15-minute expiry**, HMAC-SHA256, in-memory only (never localStorage)
-- Refresh tokens: **7-day expiry**, httpOnly cookie, SHA-256 hash stored in D1
-- Token rotation: old refresh token revoked on every use
-- Cross-tenant protection: JWT `tenantId` must match resolved tenant on every request
-- Password: PBKDF2-SHA256 100k iterations + random salt + constant-time compare
-- Timing-safe login: always runs hash check even for missing users
+| `webinar.test.ts` (routes) | 13 new |
+| `jwt.test.ts` | 10 |
+| `password.test.ts` | 4 |
+| `db.test.ts` | 3 |
+| `constants.test.ts` | 6 |
+| `schemas.test.ts` | 18 |
+| `components.test.tsx` | 33 |
 
 ---
 
-## Verification Results (Phase 3)
+## Verification Results (Phase 4)
 
 | Check | Result |
 |---|---|
 | `tsc --noEmit` | ✅ 0 errors |
 | `eslint` | ✅ 0 errors, 0 warnings |
-| `vitest run` | ✅ **74/74 tests pass** (6 files) |
-| `vite build` | ✅ 220 modules, 0 warnings, 6.75s |
-| `git push` | ✅ Commit `64290a0` |
-
-**New test files (17 tests):**
-- `src/server/lib/jwt.test.ts` — 10 tests (sign/verify, tamper, expiry, malformed)
-- `src/server/lib/password.test.ts` — 4 tests (hash/verify, salt uniqueness, malformed)
-- `src/server/lib/db.test.ts` — 3 tests (ULID format, uniqueness, time ordering)
+| `vitest run` | ✅ **87/87 tests pass** (7 files) |
+| `vite build` | ✅ 236 modules, 0 errors (1 CSS minifier warning — harmless) |
+| `git push` | ✅ Committed and pushed |
 
 ---
 
-## Next Phase Instructions — Phase 4: Public Registration Flow
+## Next Phase Instructions — Phase 5: Admin Dashboard + Webinar Management UI
 
 ### Goal
-Build the complete public-facing webinar registration experience.
+Build the authenticated admin interface for managing webinars and viewing registrations.
 
-### New API Routes
+### New Client Pages
+
+#### Admin Webinars List (`/admin/webinars`)
+- Table of all webinars with status badge, date, registration count, actions
+- Sortable columns, status filter tabs (All / Draft / Published / Live / Ended)
+- Quick-action buttons: Publish, Go Live, End, Archive
+- "Create webinar" button → modal or inline form
+
+#### Admin Webinar Create/Edit (`/admin/webinars/new`, `/admin/webinars/:id/edit`)
+- Form: title, description, host, date, start/end time, timezone, YouTube video ID, max participants
+- Uses Phase 2 Input, Textarea, Select, DatePicker components
+- Autosave draft (PUT on blur)
+
+#### Admin Webinar Detail (`/admin/webinars/:id`)
+- Status machine controls (Publish / Go Live / End)
+- Registration list with name, email, country, registered_at, attended badge
+- Export CSV button (client-side generation from the list)
+- Embed link + attend URL generator
+
+#### Admin Dashboard (upgrade `/admin`)
+- Summary cards: Total webinars, Live now, Registrations today, Attendance rate
+- Upcoming webinars list (next 3)
+
+### New React Query Hooks
+- `useWebinars(params)` — paginated list with status filter
+- `useWebinar(id)` — single webinar detail
+- `useRegistrations(webinarId)` — registration list for a webinar
+
+### Auth Gate (`RequireAuth` component)
+- Wrap all `/admin/*` routes
+- Redirect to `/admin/login` if not authenticated
+- Show loading spinner during session restore
+
+### Admin Login Page (`/admin/login`)
+- Email + password form
+- Calls `api.auth.login()`
+- On success: redirect to `/admin`
+- Error state with clear messaging
+
+### Webinar Status Machine UI Rules
+- `DRAFT` → can edit everything, can Publish
+- `PUBLISHED` → can edit (except start_date), can Go Live
+- `LIVE` → read-only, can End
+- `ENDED` → read-only, archived registrations visible
+- `ARCHIVED` → read-only
+
+### CSV Export
+Client-side only — fetch all registrations via API then generate:
 ```
-GET  /api/v1/webinars/:id/public     → Public webinar info (title, date, host, status)
-POST /api/v1/webinars/:id/register   → Register a participant
-GET  /api/v1/attend/:token           → Validate access token → webinar details + YouTube ID
-POST /api/v1/webinars/:id/feedback   → Submit post-webinar feedback + lead capture
+Name,Email,Phone,Country,City,Registered At,Attended
 ```
-
-### New DB Helpers (add to `src/server/lib/db.ts`)
-- `getPublicWebinar(db, tenantId, webinarId)` — only if PUBLISHED or LIVE
-- `findRegistrationByToken(db, token)` — for the attend route
-- `createRegistration(db, tenantId, webinarId, data)` — check max_participants first
-- `createLeadCapture(db, tenantId, webinarId, data)`
-- `createConsentRecord(db, tenantId, email, type, granted, meta)` — DPDP/GDPR
-
-### New Routes
-- `src/server/routes/public/webinar.ts` — public webinar + register + attend + feedback
-
-### Rate Limiting
-- Registration: 3 registrations per IP per webinar per 10 minutes (use DO or D1 counter)
-- Feedback: 1 per registration token
-
-### Client Pages
-- `src/client/pages/public/RegisterPage.tsx` — registration form using Phase 2 components
-  - PhoneInput, CountrySelect, Input, Checkbox (consent), RadioGroup (interest)
-  - Zod validation matching the server schema
-  - Success state: show confirmation + calendar links (Google/Apple/Outlook ICS)
-- `src/client/pages/attend/AttendPage.tsx` — `/w/:token` — YouTube embed + chat sidebar stub
-- `src/client/pages/public/FeedbackPage.tsx` — StarRating, Textarea, RadioGroup (interest), Checkbox (contact_requested)
 
 ### Tests to Add
-- Registration route tests (capacity check, duplicate detection, Turnstile bypass for dev)
-- Attend route tests (valid/invalid/expired tokens)
-- Feedback route tests
-
-### Rules
-- ALL registration forms must record at least `necessary` consent in `consent_records`
-- Registration confirmation email stub (Phase 7 sends real email — Phase 4 just logs it)
-- `access_token` is 48 random bytes → hex (same `generateSecureToken(48)`)
-- For Phase 4, skip real Turnstile verification in development (`ENVIRONMENT === 'development'`)
+- `useWebinars` hook (React Query + msw mock)
+- Admin webinar CRUD form validation
+- Status transition button enable/disable logic
 
 ---
 
@@ -153,11 +151,11 @@ POST /api/v1/webinars/:id/feedback   → Submit post-webinar feedback + lead cap
 ```bash
 npm run dev          # Vite dev server → localhost:5173
 npm run dev:worker   # Wrangler → localhost:8787
-npm test             # 74 unit tests
+npm test             # 87 unit tests (7 files)
 npm run build        # Production build
 ```
 
 ---
 
-*Last updated: Phase 3 complete*
-*Awaiting approval to proceed with Phase 4*
+*Last updated: Phase 4 complete*
+*Awaiting approval to proceed with Phase 5*
