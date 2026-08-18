@@ -134,3 +134,37 @@ export interface DbWebinar {
   created_at: string
   updated_at: string
 }
+
+export interface DbRegistration {
+  id: string
+  tenant_id: string
+  webinar_id: string
+  name: string
+  email: string
+  phone_e164: string | null
+  country_code: string | null
+  state_province: string | null
+  city: string | null
+  access_token: string
+  attended: number
+  registered_at: string
+  attended_at: string | null
+}
+
+export interface DbLeadCapture {
+  id: string
+  tenant_id: string
+  webinar_id: string | null
+  registration_id: string | null
+  name: string
+  email: string
+  phone_e164: string | null
+  country_code: string | null
+  interests: string        // JSON array
+  rating: number | null
+  suggestion: string | null
+  contact_requested: number
+  preferred_contact: string | null
+  created_at: string
+}
+

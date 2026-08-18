@@ -14,6 +14,8 @@ import type {
   DbWebinar,
   DbTenantBranding,
   DbTenantSettings,
+  DbRegistration,
+  DbLeadCapture,
 } from '../types'
 
 // ── ULID generation (no npm dep) ──────────────────────────────────
@@ -274,4 +276,234 @@ export async function revokeRefreshToken(db: D1Database, tokenHash: string): Pro
     .prepare('UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?')
     .bind(tokenHash)
     .run()
+}
+
+// ── Public webinar queries (Phase 4) ─────────────────────────────
+
+/** Get a webinar visible to the public — only PUBLISHED or LIVE status */
+export async function getPublicWebinar(
+  db: D1Database,
+  tenantId: string,
+  webinarId: string,
+): Promise<DbWebinar | null> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM webinars
+       WHERE id = ? AND tenant_id = ?
+         AND status IN ('PUBLISHED','LIVE')
+       LIMIT 1`,
+    )
+    .bind(webinarId, tenantId)
+    .first<DbWebinar>()
+  return result ?? null
+}
+
+/** Count current registrations for a webinar (for capacity check) */
+export async function countRegistrations(
+  db: D1Database,
+  tenantId: string,
+  webinarId: string,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      'SELECT COUNT(*) as count FROM webinar_registrations WHERE webinar_id = ? AND tenant_id = ?',
+    )
+    .bind(webinarId, tenantId)
+    .first<{ count: number }>()
+  return result?.count ?? 0
+}
+
+/** Check if an email is already registered for a webinar */
+export async function findExistingRegistration(
+  db: D1Database,
+  tenantId: string,
+  webinarId: string,
+  email: string,
+): Promise<DbRegistration | null> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM webinar_registrations
+       WHERE webinar_id = ? AND tenant_id = ? AND email = ?
+       LIMIT 1`,
+    )
+    .bind(webinarId, tenantId, email.toLowerCase())
+    .first<DbRegistration>()
+  return result ?? null
+}
+
+/** Find a registration by its unique access token */
+export async function findRegistrationByToken(
+  db: D1Database,
+  token: string,
+): Promise<DbRegistration | null> {
+  const result = await db
+    .prepare('SELECT * FROM webinar_registrations WHERE access_token = ? LIMIT 1')
+    .bind(token)
+    .first<DbRegistration>()
+  return result ?? null
+}
+
+/** Create a new registration. Returns null if webinar is at capacity or already registered. */
+export async function createRegistration(
+  db: D1Database,
+  tenantId: string,
+  webinarId: string,
+  accessToken: string,
+  data: {
+    name: string
+    email: string
+    phoneE164?: string
+    countryCode?: string
+    stateProvince?: string
+    city?: string
+  },
+): Promise<DbRegistration> {
+  const id = generateULID()
+  const now = new Date().toISOString()
+
+  await db
+    .prepare(
+      `INSERT INTO webinar_registrations
+       (id, tenant_id, webinar_id, name, email, phone_e164, country_code,
+        state_province, city, access_token, registered_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id, tenantId, webinarId,
+      data.name,
+      data.email.toLowerCase(),
+      data.phoneE164 ?? null,
+      data.countryCode ?? null,
+      data.stateProvince ?? null,
+      data.city ?? null,
+      accessToken,
+      now,
+    )
+    .run()
+
+  const reg = await db
+    .prepare('SELECT * FROM webinar_registrations WHERE id = ? LIMIT 1')
+    .bind(id)
+    .first<DbRegistration>()
+  return reg!
+}
+
+/** Create a lead capture record */
+export async function createLeadCapture(
+  db: D1Database,
+  tenantId: string,
+  data: {
+    webinarId?: string
+    registrationId?: string
+    name: string
+    email: string
+    phoneE164?: string
+    countryCode?: string
+    interests: string[]
+    rating?: number
+    suggestion?: string
+    contactRequested: boolean
+    preferredContact?: 'email' | 'whatsapp' | 'call'
+  },
+): Promise<DbLeadCapture> {
+  const id = generateULID()
+  const now = new Date().toISOString()
+
+  await db
+    .prepare(
+      `INSERT INTO lead_captures
+       (id, tenant_id, webinar_id, registration_id, name, email, phone_e164,
+        country_code, interests, rating, suggestion, contact_requested,
+        preferred_contact, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id, tenantId,
+      data.webinarId ?? null,
+      data.registrationId ?? null,
+      data.name,
+      data.email.toLowerCase(),
+      data.phoneE164 ?? null,
+      data.countryCode ?? null,
+      JSON.stringify(data.interests),
+      data.rating ?? null,
+      data.suggestion ?? null,
+      data.contactRequested ? 1 : 0,
+      data.preferredContact ?? null,
+      now,
+    )
+    .run()
+
+  const lead = await db
+    .prepare('SELECT * FROM lead_captures WHERE id = ? LIMIT 1')
+    .bind(id)
+    .first<DbLeadCapture>()
+  return lead!
+}
+
+/** Record a DPDP/GDPR consent event (insert-only, never updated) */
+export async function createConsentRecord(
+  db: D1Database,
+  tenantId: string,
+  data: {
+    subjectEmail: string
+    subjectPhone?: string
+    consentType: 'necessary' | 'marketing' | 'analytics' | 'contact'
+    granted: boolean
+    ipAddress?: string
+    userAgent?: string
+    sourceUrl?: string
+    legalBasis?: string
+  },
+): Promise<void> {
+  const id = generateULID()
+  const now = new Date().toISOString()
+
+  await db
+    .prepare(
+      `INSERT INTO consent_records
+       (id, tenant_id, subject_email, subject_phone, consent_type, granted,
+        ip_address, user_agent, source_url, legal_basis, recorded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id, tenantId,
+      data.subjectEmail.toLowerCase(),
+      data.subjectPhone ?? null,
+      data.consentType,
+      data.granted ? 1 : 0,
+      data.ipAddress ?? null,
+      data.userAgent ?? null,
+      data.sourceUrl ?? null,
+      data.legalBasis ?? 'consent',
+      now,
+    )
+    .run()
+}
+
+/** Mark a registration as attended */
+export async function markAttended(
+  db: D1Database,
+  registrationId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE webinar_registrations
+       SET attended = 1, attended_at = datetime('now')
+       WHERE id = ? AND attended = 0`,
+    )
+    .bind(registrationId)
+    .run()
+}
+
+/** Count feedback already submitted for a registration (duplicate guard) */
+export async function countFeedbackForRegistration(
+  db: D1Database,
+  registrationId: string,
+): Promise<number> {
+  const result = await db
+    .prepare('SELECT COUNT(*) as count FROM lead_captures WHERE registration_id = ?')
+    .bind(registrationId)
+    .first<{ count: number }>()
+  return result?.count ?? 0
 }
