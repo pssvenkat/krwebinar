@@ -2,9 +2,13 @@ import { Hono } from 'hono'
 import { secureHeaders } from 'hono/secure-headers'
 import { logger } from 'hono/logger'
 import { healthRouter } from './routes/health'
-import type { Env } from './types'
+import { tenantRoutes } from './routes/tenant'
+import { authRoutes } from './routes/auth'
+import { webinarAdminRoutes } from './routes/admin/webinars'
+import { tenantMiddleware } from './middleware/tenant'
+import type { Env, HonoVariables } from './types'
 
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 
 // ─────────────────────────────────────────────────────────────────
 // Global middleware
@@ -12,8 +16,9 @@ const app = new Hono<{ Bindings: Env }>()
 
 app.use('*', logger())
 app.use('*', secureHeaders())
+
+// CORS
 app.use('/api/*', async (c, next) => {
-  // CORS — restrict to known origins in production
   const origin = c.req.header('origin') ?? ''
   const env = c.env.ENVIRONMENT ?? 'development'
   const isAllowed =
@@ -25,7 +30,7 @@ app.use('/api/*', async (c, next) => {
   if (isAllowed || env === 'development') {
     c.header('Access-Control-Allow-Origin', origin || '*')
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-Slug')
     c.header('Access-Control-Allow-Credentials', 'true')
   }
 
@@ -36,18 +41,26 @@ app.use('/api/*', async (c, next) => {
   return next()
 })
 
+// Tenant resolution — runs for all /api/v1/* routes
+app.use('/api/v1/*', tenantMiddleware())
+
 // ─────────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────────
 
+// Platform-level (no tenant required)
 app.route('/api', healthRouter)
+
+// Tenant-scoped v1 API
+app.route('/api/v1/tenant', tenantRoutes)
+app.route('/api/v1/auth', authRoutes)
+app.route('/api/v1/admin/webinars', webinarAdminRoutes)
 
 // 404 handler for unmatched API routes
 app.notFound((c) => {
   if (c.req.path.startsWith('/api/')) {
     return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404)
   }
-  // Let non-API routes fall through to the static asset handler
   return c.notFound()
 })
 

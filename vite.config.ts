@@ -37,5 +37,9 @@ export default defineConfig({
     setupFiles: ['./src/client/test-setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['src/**/*.e2e.{ts,tsx}', 'tests/e2e/**'],
+    environmentMatchGlobs: [
+      // Server-side lib tests run in Node (no DOM needed, Web Crypto available)
+      ['src/server/**', 'node'],
+    ],
   },
 })
