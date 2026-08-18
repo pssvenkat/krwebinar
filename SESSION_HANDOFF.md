@@ -5,9 +5,9 @@
 
 ---
 
-## Current Phase: PHASE 2 COMPLETE ✅
+## Current Phase: PHASE 3 COMPLETE ✅
 
-## Next Phase: PHASE 3 — Multi-Tenant Foundation
+## Next Phase: PHASE 4 — Public Registration Flow
 
 ---
 
@@ -15,184 +15,149 @@
 
 | Item | Status |
 |---|---|
-| GitHub repo | Active — 3 commits on `main` |
+| GitHub repo | Active — 5 commits on `main` |
 | Local clone | `c:\Users\venka\.gemini\antigravity\scratch\kfwebinar` |
-| Last commit | `feat: add design system component library (Phase 2)` |
+| Last commit | `feat: add multi-tenant API foundation (Phase 3)` — `64290a0` |
 
 ---
 
-## Phase 2 Summary — Design System
+## Phase 3 Summary — Multi-Tenant API Foundation
 
-### Components Built (22 total)
+### D1 Migration Added
+`db/migrations/0002_webinars.sql` — 5 new tables:
+- `webinars` — tenant-scoped, status: DRAFT→PUBLISHED→LIVE→ENDED→ARCHIVED
+- `webinar_registrations` — participant rows, unique `access_token` for /w/:token access
+- `lead_captures` — post-webinar interest signals
+- `consent_records` — **immutable** DPDP/GDPR audit trail (insert-only)
+- `refresh_tokens` — JWT refresh token rotation with revocation
 
-All components live in `src/client/components/ui/` and are exported from `src/client/components/ui/index.ts`.
+### Server Library (`src/server/lib/`)
 
-| File | Components |
+| File | Purpose |
 |---|---|
-| `Button.tsx` | `Button` — 6 variants, 3 sizes, loading, icons |
-| `Input.tsx` | `Input` — label, hint, error, icon slots |
-| `Select.tsx` | `Select` — accessible dropdown |
-| `Textarea.tsx` | `Textarea` — character count |
-| `Checkbox.tsx` | `Checkbox`, `Radio`, `RadioGroup` |
-| `PhoneInput.tsx` | `PhoneInput` — E.164, flag picker, as-you-type |
-| `CountrySelect.tsx` | `CountrySelect` — 249 countries, flag emoji |
-| `Card.tsx` | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` |
-| `Badge.tsx` | `Badge`, `WebinarStatusBadge` — 8 variants |
-| `Modal.tsx` | `Modal` — focus trap, scroll lock, 5 sizes |
-| `Drawer.tsx` | `Drawer` — left/right slide |
-| `Tabs.tsx` | `Tabs`, `TabList`, `Tab`, `TabPanel` — ARIA |
-| `Table.tsx` | `Table` — generic typed, sortable, loading |
-| `Pagination.tsx` | `Pagination` — smart ellipsis |
-| `Toast.tsx` | `ToastProvider`, `useToast` — auto-dismiss |
-| `Alert.tsx` | `Alert` — 4 semantic variants |
-| `Dropdown.tsx` | `Dropdown` — ARIA menu role |
-| `Avatar.tsx` | `Avatar` — image or initials fallback |
-| `States.tsx` | `EmptyState`, `LoadingState`, `ErrorState` |
-| `StarRating.tsx` | `StarRating` — keyboard nav, readonly |
-| `Progress.tsx` | `Progress` — 4 variants, animated |
-| `ThemePreview.tsx` | `ThemePreview` — full design token showcase |
+| `jwt.ts` | HMAC-SHA256 JWT sign/verify, `generateSecureToken`, `hashToken` — Web Crypto, zero deps |
+| `password.ts` | PBKDF2-SHA256 hash/verify (100k iterations, 16-byte salt) — constant-time compare |
+| `db.ts` | Typed D1 queries + ULID generator — ALL queries require `tenant_id` |
 
-### Styles
-- `src/client/components.css` — ~400 lines, all values use `var(--color-*)` tokens
-- Imported in `src/client/main.tsx` (after `index.css`)
+### Server Middleware (`src/server/middleware/`)
 
-### Design System Page
-- Route: `/design-system`
-- File: `src/client/pages/dev/DesignSystemPage.tsx`
-- 4 tabs: Theme Showcase, Interactive (Modal/Drawer/Toast/Dropdown), Forms (PhoneInput/CountrySelect/StarRating), Data (Table/Pagination)
+| File | Purpose |
+|---|---|
+| `tenant.ts` | Resolves tenant from X-Tenant-Slug header → subdomain → custom domain. Sets `c.get('tenant')` |
+| `auth.ts` | `requireAuth()` — verifies Bearer JWT, blocks cross-tenant tokens. `requireRole()` — RBAC |
+
+### Server Routes (`src/server/routes/`)
+
+| Route | Method | Auth | Description |
+|---|---|---|---|
+| `/api/v1/tenant` | GET | None | Public branding + settings |
+| `/api/v1/auth/login` | POST | None | email+password → access token + httpOnly refresh cookie |
+| `/api/v1/auth/refresh` | POST | Cookie | Rotate refresh token → new access token |
+| `/api/v1/auth/logout` | POST | Cookie | Revoke refresh token, clear cookie |
+| `/api/v1/auth/me` | GET | Bearer | Current user profile |
+| `/api/v1/admin/webinars` | GET | Bearer | List with pagination + status filter |
+| `/api/v1/admin/webinars` | POST | Bearer | Create webinar |
+| `/api/v1/admin/webinars/:id` | GET | Bearer | Get one |
+| `/api/v1/admin/webinars/:id` | PUT | Bearer | Update (blocked for LIVE/ENDED) |
+| `/api/v1/admin/webinars/:id` | DELETE | VENDOR_ADMIN | Archive |
+| `/api/v1/admin/webinars/:id/publish` | POST | Bearer | DRAFT → PUBLISHED |
+| `/api/v1/admin/webinars/:id/go-live` | POST | Bearer | PUBLISHED → LIVE |
+| `/api/v1/admin/webinars/:id/end` | POST | Bearer | LIVE → ENDED |
+
+### Client (`src/client/`)
+
+| File | Purpose |
+|---|---|
+| `lib/api.ts` | Typed fetch wrapper — in-memory token, silent refresh on 401, X-Tenant-Slug dev header |
+| `contexts/AuthContext.tsx` | Login/logout state, session restore on mount via silent refresh |
+| `hooks/useAuth.ts` | Convenience re-export of `useAuthContext` |
+| `hooks/useTenant.ts` | React Query tenant hook — fetches branding, applies CSS vars to document root |
+
+### Security Architecture
+- Access tokens: **15-minute expiry**, HMAC-SHA256, in-memory only (never localStorage)
+- Refresh tokens: **7-day expiry**, httpOnly cookie, SHA-256 hash stored in D1
+- Token rotation: old refresh token revoked on every use
+- Cross-tenant protection: JWT `tenantId` must match resolved tenant on every request
+- Password: PBKDF2-SHA256 100k iterations + random salt + constant-time compare
+- Timing-safe login: always runs hash check even for missing users
 
 ---
 
-## Verification Results (Phase 2)
+## Verification Results (Phase 3)
 
 | Check | Result |
 |---|---|
 | `tsc --noEmit` | ✅ 0 errors |
 | `eslint` | ✅ 0 errors, 0 warnings |
-| `vitest run` | ✅ **57/57 tests pass** (3 files) |
-| `vite build` | ✅ 220 modules, 17.4s, 0 warnings |
-| `git push` | ✅ Pushed to `origin/main` |
+| `vitest run` | ✅ **74/74 tests pass** (6 files) |
+| `vite build` | ✅ 220 modules, 0 warnings, 6.75s |
+| `git push` | ✅ Commit `64290a0` |
+
+**New test files (17 tests):**
+- `src/server/lib/jwt.test.ts` — 10 tests (sign/verify, tamper, expiry, malformed)
+- `src/server/lib/password.test.ts` — 4 tests (hash/verify, salt uniqueness, malformed)
+- `src/server/lib/db.test.ts` — 3 tests (ULID format, uniqueness, time ordering)
 
 ---
 
-## All Files (Cumulative — Phases 0–2)
-
-```
-Phase 0: docs/OVERVIEW.md, docs/ARCHITECTURE.md, docs/ROADMAP.md
-
-Phase 1: package.json, tsconfig.json, tsconfig.worker.json, vite.config.ts,
-         tailwind.config.ts, postcss.config.js, eslint.config.js, wrangler.toml,
-         playwright.config.ts, index.html, public/favicon.svg, .env.example,
-         src/shared/types/index.ts, src/shared/schemas/index.ts,
-         src/shared/constants/index.ts, src/server/index.ts,
-         src/server/routes/health.ts, src/server/types.ts,
-         src/durable-objects/WebinarRoom.ts,
-         src/client/index.css, src/client/main.tsx, src/client/App.tsx,
-         src/client/pages/public/HomePage.tsx,
-         src/client/pages/public/NotFoundPage.tsx,
-         src/client/pages/admin/AdminLayout.tsx,
-         src/client/pages/admin/AdminDashboard.tsx,
-         db/migrations/0001_initial_schema.sql,
-         tests/e2e/foundation.spec.ts
-
-Phase 2: src/client/components.css,
-         src/client/components/ui/Button.tsx,
-         src/client/components/ui/Input.tsx,
-         src/client/components/ui/Select.tsx,
-         src/client/components/ui/Textarea.tsx,
-         src/client/components/ui/Checkbox.tsx,
-         src/client/components/ui/PhoneInput.tsx,
-         src/client/components/ui/CountrySelect.tsx,
-         src/client/components/ui/Card.tsx,
-         src/client/components/ui/Badge.tsx,
-         src/client/components/ui/Modal.tsx,
-         src/client/components/ui/Drawer.tsx,
-         src/client/components/ui/Tabs.tsx,
-         src/client/components/ui/Table.tsx,
-         src/client/components/ui/Pagination.tsx,
-         src/client/components/ui/Toast.tsx,
-         src/client/components/ui/Alert.tsx,
-         src/client/components/ui/Dropdown.tsx,
-         src/client/components/ui/Avatar.tsx,
-         src/client/components/ui/States.tsx,
-         src/client/components/ui/StarRating.tsx,
-         src/client/components/ui/Progress.tsx,
-         src/client/components/ui/ThemePreview.tsx,
-         src/client/components/ui/index.ts,
-         src/client/components/ui/components.test.tsx,
-         src/client/pages/dev/DesignSystemPage.tsx
-```
-
----
-
-## Next Phase Instructions — Phase 3: Multi-Tenant Foundation
+## Next Phase Instructions — Phase 4: Public Registration Flow
 
 ### Goal
-Build the core multi-tenant API layer — every request is tenant-scoped from the Worker edge.
+Build the complete public-facing webinar registration experience.
 
-### D1 Schema Additions
-- `webinars` table (references tenants)
-- `webinar_registrations` table
-- `lead_captures` table
-- `consent_records` table (DPDP/GDPR)
-
-Migration file: `db/migrations/0002_webinars.sql`
-
-### Worker API Routes (Hono)
-All routes under `/api/v1/` — tenant resolved from:
-1. Custom domain → `Host` header lookup in D1
-2. Subdomain → `{slug}.platform.com`
-3. Dev fallback → `X-Tenant-Slug` header
-
+### New API Routes
 ```
-GET  /api/v1/tenant              → Public tenant branding + settings
-POST /api/v1/auth/login          → Vendor admin login (JWT)
-GET  /api/v1/auth/me             → Current user profile
-POST /api/v1/auth/refresh        → Refresh JWT
-GET  /api/v1/admin/webinars      → List webinars (tenant-scoped)
-POST /api/v1/admin/webinars      → Create webinar
-GET  /api/v1/admin/webinars/:id  → Get webinar detail
-PUT  /api/v1/admin/webinars/:id  → Update webinar
+GET  /api/v1/webinars/:id/public     → Public webinar info (title, date, host, status)
+POST /api/v1/webinars/:id/register   → Register a participant
+GET  /api/v1/attend/:token           → Validate access token → webinar details + YouTube ID
+POST /api/v1/webinars/:id/feedback   → Submit post-webinar feedback + lead capture
 ```
 
-### Server Files to Create
-- `src/server/middleware/tenant.ts` — resolve tenant from request
-- `src/server/middleware/auth.ts` — JWT verify + RBAC
-- `src/server/routes/tenant.ts` — public tenant endpoint
-- `src/server/routes/auth.ts` — login/refresh
-- `src/server/routes/admin/webinars.ts` — CRUD
-- `src/server/lib/jwt.ts` — sign/verify with Web Crypto API (no npm deps)
-- `src/server/lib/password.ts` — bcrypt-compatible hashing via Web Crypto
+### New DB Helpers (add to `src/server/lib/db.ts`)
+- `getPublicWebinar(db, tenantId, webinarId)` — only if PUBLISHED or LIVE
+- `findRegistrationByToken(db, token)` — for the attend route
+- `createRegistration(db, tenantId, webinarId, data)` — check max_participants first
+- `createLeadCapture(db, tenantId, webinarId, data)`
+- `createConsentRecord(db, tenantId, email, type, granted, meta)` — DPDP/GDPR
 
-### Client Files to Create
-- `src/client/lib/api.ts` — typed fetch wrapper with auth token injection
-- `src/client/hooks/useTenant.ts` — React Query tenant hook
-- `src/client/contexts/AuthContext.tsx` — JWT auth state
-- `src/client/hooks/useAuth.ts` — login/logout/refresh
+### New Routes
+- `src/server/routes/public/webinar.ts` — public webinar + register + attend + feedback
+
+### Rate Limiting
+- Registration: 3 registrations per IP per webinar per 10 minutes (use DO or D1 counter)
+- Feedback: 1 per registration token
+
+### Client Pages
+- `src/client/pages/public/RegisterPage.tsx` — registration form using Phase 2 components
+  - PhoneInput, CountrySelect, Input, Checkbox (consent), RadioGroup (interest)
+  - Zod validation matching the server schema
+  - Success state: show confirmation + calendar links (Google/Apple/Outlook ICS)
+- `src/client/pages/attend/AttendPage.tsx` — `/w/:token` — YouTube embed + chat sidebar stub
+- `src/client/pages/public/FeedbackPage.tsx` — StarRating, Textarea, RadioGroup (interest), Checkbox (contact_requested)
 
 ### Tests to Add
-- Worker route unit tests (Vitest + Miniflare)
-- Tenant resolution middleware tests
-- JWT sign/verify tests
+- Registration route tests (capacity check, duplicate detection, Turnstile bypass for dev)
+- Attend route tests (valid/invalid/expired tokens)
+- Feedback route tests
 
 ### Rules
-- ALL database queries must include `WHERE tenant_id = ?` — never bare queries
-- JWT contains `{ sub: userId, tenantId, role, iat, exp }`
-- Tokens expire in 15 minutes; refresh tokens in 7 days (httpOnly cookie)
-- No PLATFORM_OWNER routes yet — Phase 3 is vendor-only admin
+- ALL registration forms must record at least `necessary` consent in `consent_records`
+- Registration confirmation email stub (Phase 7 sends real email — Phase 4 just logs it)
+- `access_token` is 48 random bytes → hex (same `generateSecureToken(48)`)
+- For Phase 4, skip real Turnstile verification in development (`ENVIRONMENT === 'development'`)
 
 ---
 
-## Commands
+## Cumulative Commands
 
 ```bash
 npm run dev          # Vite dev server → localhost:5173
 npm run dev:worker   # Wrangler → localhost:8787
-npm test             # 57 unit tests
+npm test             # 74 unit tests
 npm run build        # Production build
 ```
 
 ---
 
-*Last updated: Phase 2 complete*
-*Awaiting approval to proceed with Phase 3*
+*Last updated: Phase 3 complete*
+*Awaiting approval to proceed with Phase 4*
