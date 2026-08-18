@@ -8,6 +8,9 @@ import NotFoundPage from './pages/public/NotFoundPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 
+// Dev pages
+import DesignSystemPage from './pages/dev/DesignSystemPage'
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -28,6 +31,9 @@ export default function App() {
 
         {/* ── Platform admin routes (Phase 3+) ── */}
         {/* <Route path="/platform" element={<PlatformLayout />}> */}
+
+        {/* ── Dev routes (design system showcase) ── */}
+        <Route path="/design-system" element={<DesignSystemPage />} />
 
         {/* ── Fallbacks ── */}
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
