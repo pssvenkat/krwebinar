@@ -7,7 +7,9 @@ import { authRoutes } from './routes/auth'
 import { webinarAdminRoutes } from './routes/admin/webinars'
 import { registrationAdminRoutes } from './routes/admin/registrations'
 import { publicWebinarRoutes } from './routes/public/webinar'
+import { unsubscribeRoutes } from './routes/public/unsubscribe'
 import { tenantMiddleware } from './middleware/tenant'
+import { scheduled } from './scheduler'
 import type { Env, HonoVariables } from './types'
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
@@ -63,6 +65,9 @@ app.route('/api/v1/admin/webinars', registrationAdminRoutes)
 app.route('/api/v1/webinars', publicWebinarRoutes)
 app.route('/api/v1/attend', publicWebinarRoutes)
 
+// Unsubscribe (no auth, no tenant — keyed by access_token)
+app.route('/api/v1/unsubscribe', unsubscribeRoutes)
+
 // 404 handler for unmatched API routes
 app.notFound((c) => {
   if (c.req.path.startsWith('/api/')) {
@@ -88,9 +93,10 @@ app.onError((err, c) => {
 })
 
 // ─────────────────────────────────────────────────────────────────
-// Durable Object exports
+// Exports: Durable Objects + Cron handler
 // ─────────────────────────────────────────────────────────────────
 
 export { WebinarRoom } from '../durable-objects/WebinarRoom'
+export { scheduled }
 
 export default app

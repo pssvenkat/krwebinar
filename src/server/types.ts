@@ -149,6 +149,7 @@ export interface DbRegistration {
   attended: number
   registered_at: string
   attended_at: string | null
+  email_opt_out: number   // 0 = opted in, 1 = opted out (DPDP)
 }
 
 export interface DbLeadCapture {

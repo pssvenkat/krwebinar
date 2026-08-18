@@ -42,3 +42,8 @@ ENVIRONMENT = "development"
 [env.production]
 [env.production.vars]
 ENVIRONMENT = "production"
+
+# Cron triggers — Phase 6
+# Every 15 minutes: send 30-min pre-webinar reminder emails
+[triggers]
+crons = ["*/15 * * * *"]

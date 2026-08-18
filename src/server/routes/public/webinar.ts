@@ -185,8 +185,13 @@ publicWebinarRoutes.post('/:id/register', zValidator('json', registerSchema), as
     })
   }
 
-  // 7. TODO Phase 7: Send confirmation email (stub — log only)
-  console.warn(`[Registration] ${data.email} registered for ${webinar.title} — token: ${accessToken.slice(0, 8)}… (email stub — Phase 7)`)
+  // 7. Send confirmation email (non-blocking — best effort)
+  const { sendConfirmationEmail } = await import('../../lib/email')
+  c.executionCtx.waitUntil(
+    sendConfirmationEmail(c.env, registration, webinar, tenant).catch((err: unknown) =>
+      console.warn('[Email] Confirmation send failed', err),
+    ),
+  )
 
   return c.json(
     {

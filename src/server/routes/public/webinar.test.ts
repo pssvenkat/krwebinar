@@ -31,6 +31,13 @@ vi.mock('../../lib/jwt', () => ({
   hashToken: vi.fn(),
 }))
 
+// Mock email module — no real sends in tests
+vi.mock('../../lib/email', () => ({
+  sendConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+  sendLiveNotifications: vi.fn().mockResolvedValue(undefined),
+  sendFeedbackRequests: vi.fn().mockResolvedValue(undefined),
+}))
+
 import {
   getPublicWebinar,
   countRegistrations,
@@ -95,6 +102,13 @@ const MOCK_REGISTRATION: DbRegistration = {
   attended: 0,
   registered_at: '2025-08-15T10:00:00Z',
   attended_at: null,
+  email_opt_out: 0,
+}
+
+/** Mock ExecutionContext — provides waitUntil so c.executionCtx.waitUntil() doesn't throw */
+const MOCK_CTX: ExecutionContext = {
+  waitUntil: vi.fn(),
+  passThroughOnException: vi.fn(),
 }
 
 function buildApp() {
@@ -108,14 +122,14 @@ function buildApp() {
   return app
 }
 
-/** Make a request with mock env bindings so c.env.DB doesn't throw */
+/** Make a request with mock env + ExecutionContext so no Hono context errors */
 async function req(
   app: ReturnType<typeof buildApp>,
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
   const request = new Request(`http://localhost${path}`, init)
-  return app.fetch(request, MOCK_ENV)
+  return app.fetch(request, MOCK_ENV, MOCK_CTX)
 }
 
 // ── GET /:id/public ───────────────────────────────────────────────
