@@ -119,6 +119,20 @@ export class WebinarRoom implements DurableObject {
       this.hostName = initialHostName
     }
 
+    if (typeof (server as any).serializeAttachment === 'function') {
+      try {
+        (server as any).serializeAttachment({
+          sessionId,
+          name: participantName,
+          isHost,
+          tenantId: this.tenantId,
+          webinarId: this.webinarId,
+        })
+      } catch {
+        // ignore
+      }
+    }
+
     this.state.acceptWebSocket(server, [sessionId])
 
     const connection: ParticipantConnection = {
@@ -152,8 +166,15 @@ export class WebinarRoom implements DurableObject {
       return
     }
 
-    // Try finding connection by sessionId or matching socket
-    let connection = this.connections.get(data.sessionId)
+    const attachment = (typeof (ws as any).deserializeAttachment === 'function'
+      ? (ws as any).deserializeAttachment()
+      : null) as { sessionId?: string; name?: string; isHost?: boolean } | null
+
+    // Try finding connection by sessionId, attachment, or matching socket
+    let connection = (data.sessionId ? this.connections.get(data.sessionId) : null) ||
+      (attachment?.sessionId ? this.connections.get(attachment.sessionId) : null) ||
+      null
+
     if (!connection) {
       for (const conn of this.connections.values()) {
         if (conn.socket === ws) {
@@ -162,7 +183,23 @@ export class WebinarRoom implements DurableObject {
         }
       }
     }
-    if (!connection) return
+
+    // Reconstruct connection from attachment or fallback if evicted during hibernation
+    if (!connection) {
+      const sId = attachment?.sessionId || data.sessionId || `session-${Date.now()}`
+      const pName = attachment?.name || data.author || data.participantName || (data.isHost ? 'Host' : 'Participant')
+      const isHost = attachment?.isHost ?? (data.isHost ?? false)
+      connection = {
+        sessionId: sId,
+        name: pName,
+        socket: ws,
+        isHost,
+        joinedAt: Date.now(),
+        messageCount: 0,
+        messageWindowStart: Date.now(),
+      }
+      this.connections.set(sId, connection)
+    }
 
     switch (data.type) {
       case 'HEARTBEAT':
@@ -519,9 +556,14 @@ export class WebinarRoom implements DurableObject {
 
   private broadcast(message: object): void {
     const payload = JSON.stringify(message)
-    for (const conn of this.connections.values()) {
+    const sockets: WebSocket[] =
+      typeof (this.state as any).getWebSockets === 'function'
+        ? (this.state as any).getWebSockets()
+        : Array.from(this.connections.values()).map((c) => c.socket)
+
+    for (const socket of sockets) {
       try {
-        conn.socket.send(payload)
+        socket.send(payload)
       } catch {
         // Ignored, cleaned up on close
       }
@@ -549,17 +591,27 @@ export class WebinarRoom implements DurableObject {
   }
 
   private sendParticipantCount(): void {
+    const socketsCount =
+      typeof (this.state as any).getWebSockets === 'function'
+        ? (this.state as any).getWebSockets().length
+        : this.connections.size
+
     this.broadcast({
       type: 'PARTICIPANT_COUNT',
-      count: this.connections.size,
+      count: Math.max(1, socketsCount),
       timestamp: new Date().toISOString(),
     })
   }
 
   private buildRoomState(): object {
+    const socketsCount =
+      typeof (this.state as any).getWebSockets === 'function'
+        ? (this.state as any).getWebSockets().length
+        : this.connections.size
+
     return {
       type: 'ROOM_STATE',
-      participantCount: this.connections.size,
+      participantCount: Math.max(1, socketsCount),
       chatEnabled: this.chatEnabled,
       qaEnabled: this.qaEnabled,
       hostName: this.hostName,
