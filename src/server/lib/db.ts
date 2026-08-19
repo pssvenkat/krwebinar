@@ -1502,3 +1502,138 @@ export function getPlatformSecurityIncidents(): PlatformSecurityIncident[] {
     },
   ]
 }
+
+// ── User Management DB Helpers ─────────────────────────────────────
+
+export interface ManagedUser {
+  id: string
+  tenant_id: string | null
+  tenant_name?: string | null
+  tenant_slug?: string | null
+  email: string
+  name: string
+  role: string
+  is_active: number
+  created_at: string
+  updated_at: string
+}
+
+export async function listAllPlatformUsers(db: D1Database): Promise<ManagedUser[]> {
+  const rows = await db
+    .prepare(
+      `SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.is_active, u.created_at, u.updated_at,
+              t.name AS tenant_name, t.slug AS tenant_slug
+       FROM users u
+       LEFT JOIN tenants t ON u.tenant_id = t.id
+       ORDER BY u.created_at DESC`,
+    )
+    .all<ManagedUser>()
+  return rows.results ?? []
+}
+
+export async function listTenantUsers(db: D1Database, tenantId: string): Promise<ManagedUser[]> {
+  const rows = await db
+    .prepare(
+      `SELECT id, tenant_id, email, name, role, is_active, created_at, updated_at
+       FROM users
+       WHERE tenant_id = ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(tenantId)
+    .all<ManagedUser>()
+  return rows.results ?? []
+}
+
+export async function createUser(
+  db: D1Database,
+  data: {
+    id: string
+    tenantId: string | null
+    email: string
+    name: string
+    passwordHash: string
+    role: string
+    isActive?: number
+  },
+): Promise<ManagedUser> {
+  const now = new Date().toISOString()
+  await db
+    .prepare(
+      `INSERT INTO users (id, tenant_id, email, name, password_hash, role, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      data.id,
+      data.tenantId ?? null,
+      data.email.toLowerCase().trim(),
+      data.name.trim(),
+      data.passwordHash,
+      data.role,
+      data.isActive ?? 1,
+      now,
+      now,
+    )
+    .run()
+
+  const created = await findUserById(db, data.id)
+  return created as unknown as ManagedUser
+}
+
+export async function updateUser(
+  db: D1Database,
+  userId: string,
+  data: {
+    name?: string
+    email?: string
+    role?: string
+    tenantId?: string | null
+    isActive?: number
+  },
+): Promise<void> {
+  const now = new Date().toISOString()
+  const sets: string[] = ['updated_at = ?']
+  const values: unknown[] = [now]
+
+  if (data.name !== undefined) {
+    sets.push('name = ?')
+    values.push(data.name.trim())
+  }
+  if (data.email !== undefined) {
+    sets.push('email = ?')
+    values.push(data.email.toLowerCase().trim())
+  }
+  if (data.role !== undefined) {
+    sets.push('role = ?')
+    values.push(data.role)
+  }
+  if (data.tenantId !== undefined) {
+    sets.push('tenant_id = ?')
+    values.push(data.tenantId)
+  }
+  if (data.isActive !== undefined) {
+    sets.push('is_active = ?')
+    values.push(data.isActive)
+  }
+
+  values.push(userId)
+  await db
+    .prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
+    .bind(...values)
+    .run()
+}
+
+export async function updateUserPassword(
+  db: D1Database,
+  userId: string,
+  passwordHash: string,
+): Promise<void> {
+  const now = new Date().toISOString()
+  await db
+    .prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+    .bind(passwordHash, now, userId)
+    .run()
+}
+
+export async function deleteUser(db: D1Database, userId: string): Promise<void> {
+  await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run()
+}

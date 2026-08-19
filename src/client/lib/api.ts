@@ -195,9 +195,46 @@ export const api = {
   leads: {
     webinar: (webinarId: string) => _fetch<{ leads: Lead[]; total: number; summary: LeadsSummary }>(`/admin/webinars/${webinarId}/leads`),
   },
+
+  // Tenant Team Users
+  users: {
+    list: () => _fetch<{ users: ManagedUser[] }>('/admin/users'),
+    create: (data: { name: string; email: string; role: string; password: string }) =>
+      _fetch<{ user: ManagedUser }>('/admin/users', { method: 'POST', body: data }),
+    update: (id: string, data: { name?: string; email?: string; role?: string; isActive?: number }) =>
+      _fetch<{ message: string }>(`/admin/users/${id}`, { method: 'PUT', body: data }),
+    resetPassword: (id: string, newPassword: string) =>
+      _fetch<{ message: string }>(`/admin/users/${id}/reset-password`, { method: 'POST', body: { newPassword } }),
+    delete: (id: string) =>
+      _fetch<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
+  },
+
+  // Platform Superadmin Users
+  platformUsers: {
+    list: () => _fetch<{ users: ManagedUser[] }>('/platform/users'),
+    create: (data: { name: string; email: string; role: string; password: string; tenantId?: string | null }) =>
+      _fetch<{ user: ManagedUser }>('/platform/users', { method: 'POST', body: data }),
+    update: (id: string, data: { name?: string; email?: string; role?: string; tenantId?: string | null; isActive?: number }) =>
+      _fetch<{ message: string }>(`/platform/users/${id}`, { method: 'PUT', body: data }),
+    resetPassword: (id: string, newPassword: string) =>
+      _fetch<{ message: string }>(`/platform/users/${id}/reset-password`, { method: 'POST', body: { newPassword } }),
+    delete: (id: string) =>
+      _fetch<{ message: string }>(`/platform/users/${id}`, { method: 'DELETE' }),
+  },
 }
 
-// ── Domain types for the client ────────────────────────────────────
+export interface ManagedUser {
+  id: string
+  tenant_id: string | null
+  tenant_name?: string | null
+  tenant_slug?: string | null
+  email: string
+  name: string
+  role: string
+  is_active: number
+  created_at: string
+  updated_at: string
+}
 
 export interface WebinarSummary {
   id: string

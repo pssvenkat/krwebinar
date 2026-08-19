@@ -44,6 +44,7 @@ export default function PlatformLayout() {
         <nav className="platform-nav">
           <PlatformNavLink to="/platform">📊 Master Dashboard</PlatformNavLink>
           <PlatformNavLink to="/platform/tenants">🏢 Tenants & Governance</PlatformNavLink>
+          <PlatformNavLink to="/platform/users">👥 User Directory</PlatformNavLink>
         </nav>
 
         <div className="platform-sidebar-footer">

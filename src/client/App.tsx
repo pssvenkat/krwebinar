@@ -32,12 +32,14 @@ const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinar
 const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
 const AdminProfilePage           = lazy(() => import('./pages/admin/AdminProfilePage'))
 const AdminPrivacyPage           = lazy(() => import('./pages/admin/AdminPrivacyPage'))
+const AdminUsersPage             = lazy(() => import('./pages/admin/AdminUsersPage'))
 // Phase 12 & 14: Platform admin pages (lazy-loaded)
 const PlatformLayout             = lazy(() => import('./pages/platform/PlatformLayout'))
 const PlatformDashboardPage      = lazy(() => import('./pages/platform/PlatformDashboardPage'))
 const PlatformTenantsPage        = lazy(() => import('./pages/platform/PlatformTenantsPage'))
 const PlatformTenantFormPage     = lazy(() => import('./pages/platform/PlatformTenantFormPage'))
 const PlatformTenantDetailPage   = lazy(() => import('./pages/platform/PlatformTenantDetailPage'))
+const PlatformUsersPage          = lazy(() => import('./pages/platform/PlatformUsersPage'))
 // Phase 13: Domains page (lazy-loaded)
 const AdminDomainsPage           = lazy(() => import('./pages/admin/AdminDomainsPage'))
 
@@ -96,6 +98,7 @@ export default function App() {
             <Route path="participants" element={<AdminRegistrationsPage />} />
             <Route path="leads" element={<AdminLeadsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
             <Route path="profile" element={<AdminProfilePage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
             <Route path="domains" element={<AdminDomainsPage />} />
@@ -115,6 +118,7 @@ export default function App() {
             <Route path="tenants" element={<PlatformTenantsPage />} />
             <Route path="tenants/new" element={<PlatformTenantFormPage />} />
             <Route path="tenants/:id" element={<PlatformTenantDetailPage />} />
+            <Route path="users" element={<PlatformUsersPage />} />
           </Route>
 
           {/* ── Dev routes ── */}
