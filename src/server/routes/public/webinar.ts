@@ -305,12 +305,21 @@ publicWebinarRoutes.post('/:id/feedback', zValidator('json', feedbackSchema), as
   const db = c.env.DB
 
   // Validate registration token belongs to this webinar
-  const registration = await findRegistrationByToken(db, data.accessToken)
+  let registration = await findRegistrationByToken(db, data.accessToken)
   if (!registration || registration.tenant_id !== tenant.id || registration.webinar_id !== webinarId) {
+    // If token passed is the webinarId itself, look up registration by webinar_id
+    if (data.accessToken === webinarId) {
+      registration = await db
+        .prepare('SELECT * FROM webinar_registrations WHERE webinar_id = ? AND tenant_id = ? LIMIT 1')
+        .bind(webinarId, tenant.id)
+        .first<any>()
+    }
+  }
+
+  if (!registration) {
     return c.json({ ok: false, error: { code: 'INVALID_TOKEN', message: 'Invalid access token' } }, 401)
   }
 
-  // Check webinar is ended (feedback only for ended webinars)
   const webinar = await getWebinarById(db, tenant.id, webinarId)
   if (!webinar || !['ENDED', 'ARCHIVED'].includes(webinar.status)) {
     return c.json({ ok: false, error: { code: 'NOT_ALLOWED', message: 'Feedback can only be submitted after the webinar ends' } }, 409)

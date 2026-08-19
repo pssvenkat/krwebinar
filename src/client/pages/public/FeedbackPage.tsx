@@ -74,7 +74,10 @@ export default function FeedbackPage() {
   const { data: attendData, isLoading: attendLoading, error: attendError } = useQuery({
     queryKey: ['attend', token],
     queryFn: async () => {
-      const r = await fetch(`/api/v1/attend/${token}`, { credentials: 'include' })
+      const r = await fetch(`/api/v1/attend/${token}`, {
+        credentials: 'include',
+        headers: { 'X-Tenant-Slug': 'krave' },
+      })
       const json = await r.json() as {
         ok: boolean
         data?: { registration: { id: string; name: string }; webinar: { id: string; title: string; status: string } }
@@ -92,7 +95,10 @@ export default function FeedbackPage() {
       const webinarId = attendData!.webinar.id
       const r = await fetch(`/api/v1/webinars/${webinarId}/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Slug': 'krave',
+        },
         credentials: 'include',
         body: JSON.stringify({ ...data, accessToken: token }),
       })
