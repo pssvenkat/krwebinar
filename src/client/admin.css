@@ -1140,3 +1140,69 @@ select.input-field:focus {
     padding: 1.25rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 13 — CUSTOM DOMAINS STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+.domain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.domain-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.domain-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.domain-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.domain-dns-table-wrapper {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.domain-dns-instructions-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.domain-dns-table code {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.8125rem;
+  background: var(--color-surface);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border);
+  word-break: break-all;
+}
+
+.domain-add-form {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+}

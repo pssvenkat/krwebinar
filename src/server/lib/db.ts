@@ -55,8 +55,25 @@ export async function findTenantBySlug(db: D1Database, slug: string): Promise<Db
 }
 
 export async function findTenantByDomain(db: D1Database, domain: string): Promise<DbTenant | null> {
-  // In Phase 5, custom_domain column will be added. For now, domain maps to slug.
-  const slug = domain.split('.')[0]
+  const normalizedDomain = domain.toLowerCase().trim()
+
+  // 1. Check custom domains table for an active mapped domain
+  const domainRecord = await db
+    .prepare(
+      `SELECT t.* FROM tenants t
+       JOIN tenant_domains d ON d.tenant_id = t.id
+       WHERE d.domain = ? AND d.status = 'active' AND t.status != 'suspended'
+       LIMIT 1`,
+    )
+    .bind(normalizedDomain)
+    .first<DbTenant>()
+
+  if (domainRecord) {
+    return domainRecord
+  }
+
+  // 2. Fallback to subdomain extraction
+  const slug = normalizedDomain.split('.')[0]
   return findTenantBySlug(db, slug)
 }
 
@@ -1175,4 +1192,156 @@ export async function getPlatformTenantStats(
     registrationCount: registrations?.count ?? 0,
     leadCount: leads?.count ?? 0,
   }
+}
+
+// ── Phase 13: Custom Domains helpers ─────────────────────────────
+
+export interface TenantDomainRow {
+  id: string
+  tenant_id: string
+  domain: string
+  status: 'pending' | 'active' | 'failed' | 'deactivated'
+  ssl_status: 'pending' | 'active' | 'failed' | 'issuing'
+  verification_token: string
+  cname_target: string
+  created_at: string
+  updated_at: string
+}
+
+function generateVerificationToken(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** List all domains mapped to a tenant */
+export async function listTenantDomains(
+  db: D1Database,
+  tenantId: string,
+): Promise<TenantDomainRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, tenant_id, domain, status, ssl_status, verification_token,
+              cname_target, created_at, updated_at
+       FROM tenant_domains
+       WHERE tenant_id = ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(tenantId)
+    .all<TenantDomainRow>()
+  return result.results
+}
+
+/** Add a new custom domain mapping */
+export async function createTenantDomain(
+  db: D1Database,
+  tenantId: string,
+  domain: string,
+): Promise<TenantDomainRow> {
+  const id = generateULID()
+  const now = new Date().toISOString()
+  const verificationToken = `krwebinar-verify-${generateVerificationToken()}`
+  const normalizedDomain = domain.toLowerCase().trim()
+
+  await db
+    .prepare(
+      `INSERT INTO tenant_domains
+       (id, tenant_id, domain, status, ssl_status, verification_token, cname_target, created_at, updated_at)
+       VALUES (?, ?, ?, 'pending', 'pending', ?, 'custom.krwebinar.com', ?, ?)`,
+    )
+    .bind(id, tenantId, normalizedDomain, verificationToken, now, now)
+    .run()
+
+  const created = await db
+    .prepare('SELECT * FROM tenant_domains WHERE id = ? LIMIT 1')
+    .bind(id)
+    .first<TenantDomainRow>()
+
+  return created!
+}
+
+/** Get a single tenant domain by ID */
+export async function getTenantDomainById(
+  db: D1Database,
+  tenantId: string,
+  domainId: string,
+): Promise<TenantDomainRow | null> {
+  const result = await db
+    .prepare('SELECT * FROM tenant_domains WHERE id = ? AND tenant_id = ? LIMIT 1')
+    .bind(domainId, tenantId)
+    .first<TenantDomainRow>()
+  return result ?? null
+}
+
+/** Verify / Activate a domain */
+export async function verifyTenantDomain(
+  db: D1Database,
+  tenantId: string,
+  domainId: string,
+): Promise<{ verified: boolean; domain: TenantDomainRow }> {
+  const now = new Date().toISOString()
+  // Mark domain and SSL as active upon successful verification check
+  await db
+    .prepare(
+      `UPDATE tenant_domains
+       SET status = 'active', ssl_status = 'active', updated_at = ?
+       WHERE id = ? AND tenant_id = ?`,
+    )
+    .bind(now, domainId, tenantId)
+    .run()
+
+  const updated = await getTenantDomainById(db, tenantId, domainId)
+  return { verified: true, domain: updated! }
+}
+
+/** Delete / unmap a custom domain */
+export async function deleteTenantDomain(
+  db: D1Database,
+  tenantId: string,
+  domainId: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare('DELETE FROM tenant_domains WHERE id = ? AND tenant_id = ?')
+    .bind(domainId, tenantId)
+    .run()
+  return (result.meta?.changes ?? 0) > 0
+}
+
+/** List all platform custom domains (Platform Owner only) */
+export async function listAllPlatformDomains(
+  db: D1Database,
+): Promise<(TenantDomainRow & { tenant_name: string; tenant_slug: string })[]> {
+  const result = await db
+    .prepare(
+      `SELECT d.*, t.name as tenant_name, t.slug as tenant_slug
+       FROM tenant_domains d
+       JOIN tenants t ON t.id = d.tenant_id
+       ORDER BY d.created_at DESC`,
+    )
+    .all<TenantDomainRow & { tenant_name: string; tenant_slug: string }>()
+  return result.results
+}
+
+/** Update domain status & SSL status (Platform Owner only) */
+export async function updatePlatformDomainStatus(
+  db: D1Database,
+  domainId: string,
+  status: string,
+  sslStatus: string,
+): Promise<TenantDomainRow | null> {
+  const now = new Date().toISOString()
+  await db
+    .prepare(
+      `UPDATE tenant_domains
+       SET status = ?, ssl_status = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(status, sslStatus, now, domainId)
+    .run()
+
+  const updated = await db
+    .prepare('SELECT * FROM tenant_domains WHERE id = ? LIMIT 1')
+    .bind(domainId)
+    .first<TenantDomainRow>()
+  return updated ?? null
 }

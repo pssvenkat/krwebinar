@@ -32,6 +32,8 @@ const PlatformLayout             = lazy(() => import('./pages/platform/PlatformL
 const PlatformTenantsPage        = lazy(() => import('./pages/platform/PlatformTenantsPage'))
 const PlatformTenantFormPage     = lazy(() => import('./pages/platform/PlatformTenantFormPage'))
 const PlatformTenantDetailPage   = lazy(() => import('./pages/platform/PlatformTenantDetailPage'))
+// Phase 13: Domains page (lazy-loaded)
+const AdminDomainsPage           = lazy(() => import('./pages/admin/AdminDomainsPage'))
 
 // Dev pages
 import DesignSystemPage from './pages/dev/DesignSystemPage'
@@ -83,6 +85,7 @@ export default function App() {
             <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
+            <Route path="domains" element={<AdminDomainsPage />} />
           </Route>
 
           {/* ── Phase 12: Platform admin routes (PLATFORM_OWNER) ── */}

@@ -9,11 +9,13 @@ import { registrationAdminRoutes } from './routes/admin/registrations'
 import { analyticsRoutes } from './routes/admin/analytics'
 import { brandingRoutes } from './routes/admin/branding'
 import { leadsRoutes } from './routes/admin/leads'
+import { domainRoutes } from './routes/admin/domains'
 import { platformRoutes } from './routes/platform/tenants'
 import { publicWebinarRoutes } from './routes/public/webinar'
 import { unsubscribeRoutes } from './routes/public/unsubscribe'
 import { wsRoutes } from './routes/attend/ws'
 import { tenantMiddleware } from './middleware/tenant'
+import { authRateLimiter, registrationRateLimiter } from './middleware/rate-limit'
 import { scheduled } from './scheduler'
 import type { Env, HonoVariables } from './types'
 
@@ -61,6 +63,9 @@ app.use('/api/v1/*', tenantMiddleware())
 app.route('/api', healthRouter)
 
 // Tenant-scoped v1 API
+app.use('/api/v1/auth/login', authRateLimiter)
+app.use('/api/v1/webinars/*/register', registrationRateLimiter)
+
 app.route('/api/v1/tenant', tenantRoutes)
 app.route('/api/v1/auth', authRoutes)
 app.route('/api/v1/admin/webinars', webinarAdminRoutes)
@@ -69,6 +74,7 @@ app.route('/api/v1/admin', analyticsRoutes)
 app.route('/api/v1/admin', brandingRoutes)
 app.route('/api/v1', brandingRoutes)    // serves /api/v1/public/branding (no auth)
 app.route('/api/v1/admin', leadsRoutes)
+app.route('/api/v1/admin/domains', domainRoutes)
 
 // Platform admin (PLATFORM_OWNER only — no tenant middleware)
 app.route('/api/platform', platformRoutes)
