@@ -1,9 +1,14 @@
-import { useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+/// <reference types="vite/client" />
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
+import { useWebSocket } from '../../hooks/useWebSocket'
+import { getAccessToken } from '../../lib/api'
+
+// ── Types ──────────────────────────────────────────────────────────
 
 interface AttendData {
   registration: { id: string; name: string; email: string }
@@ -13,6 +18,32 @@ interface AttendData {
     endTime: string; timezone: string; status: string
     youtubeVideoId: string | null; isLive: boolean; isEnded: boolean
   }
+}
+
+interface WsMessage {
+  type: string
+  timestamp: string
+  // PARTICIPANT_COUNT
+  count?: number
+  // CHAT_MESSAGE
+  id?: string
+  participantId?: string
+  participantName?: string
+  content?: string
+  // ROOM_STATE
+  participantCount?: number
+  chatEnabled?: boolean
+  // ERROR
+  code?: string
+  message?: string
+}
+
+interface ChatEntry {
+  id: string
+  name: string
+  text: string
+  ts: string
+  isHost: boolean
 }
 
 // ── YouTube embed ─────────────────────────────────────────────────
@@ -39,9 +70,10 @@ function YouTubeEmbed({ videoId, autoplay = false }: { videoId: string; autoplay
 
 // ── Waiting room ──────────────────────────────────────────────────
 
-function WaitingRoom({ webinar, participantName }: {
+function WaitingRoom({ webinar, participantName, viewerCount }: {
   webinar: AttendData['webinar']
   participantName: string
+  viewerCount: number
 }) {
   const displayDate = new Date(`${webinar.startDate}T${webinar.startTime}`).toLocaleDateString('en-IN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -51,14 +83,16 @@ function WaitingRoom({ webinar, participantName }: {
     <div className="attend-waiting">
       <div className="attend-waiting-icon" aria-hidden="true">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </div>
       <Badge variant="primary">Starts soon</Badge>
       <h2 className="attend-waiting-title">{webinar.title}</h2>
       <p className="attend-waiting-greeting">Hi <strong>{participantName}</strong> — you&apos;re all set!</p>
       <p className="attend-waiting-date">{displayDate} at {webinar.startTime} ({webinar.timezone})</p>
+      {viewerCount > 1 && (
+        <p className="attend-viewer-count">👥 {viewerCount} people are in the waiting room</p>
+      )}
       <p className="attend-waiting-hint">This page will automatically update when the webinar goes live. Keep it open!</p>
     </div>
   )
@@ -83,11 +117,73 @@ function EndedState({ webinar, token }: { webinar: AttendData['webinar']; token:
       )}
       <div className="attend-ended-actions">
         <Link to={`/w/${token}/feedback`}>
-          <Button variant="primary" size="md">
-            Share your feedback
-          </Button>
+          <Button variant="primary" size="md">Share your feedback</Button>
         </Link>
       </div>
+    </div>
+  )
+}
+
+// ── Live chat panel ───────────────────────────────────────────────
+
+function ChatPanel({ messages, sessionId: _sessionId, onSend, chatEnabled, isConnected }: {
+  messages: ChatEntry[]
+  sessionId: string
+  onSend: (text: string) => void
+  chatEnabled: boolean
+  isConnected: boolean
+}) {
+  const [draft, setDraft] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const submit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    const text = draft.trim()
+    if (!text || !isConnected) return
+    onSend(text)
+    setDraft('')
+  }, [draft, isConnected, onSend])
+
+  return (
+    <div className="attend-chat">
+      <div className="attend-chat-messages" role="log" aria-live="polite" aria-label="Live chat">
+        {messages.length === 0 && (
+          <p className="attend-chat-empty">Chat will appear here once the webinar starts.</p>
+        )}
+        {messages.map((m) => (
+          <div key={m.id} className={`attend-chat-msg${m.isHost ? ' attend-chat-msg--host' : ''}`}>
+            <span className="attend-chat-name">{m.name}</span>
+            <span className="attend-chat-text">{m.text}</span>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      {chatEnabled && (
+        <form className="attend-chat-form" onSubmit={submit}>
+          <input
+            className="attend-chat-input"
+            type="text"
+            placeholder={isConnected ? 'Type a message…' : 'Connecting…'}
+            maxLength={500}
+            value={draft}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+            disabled={!isConnected}
+            aria-label="Chat message"
+          />
+          <button
+            className="attend-chat-send"
+            type="submit"
+            disabled={!draft.trim() || !isConnected}
+            aria-label="Send message"
+          >
+            Send
+          </button>
+        </form>
+      )}
     </div>
   )
 }
@@ -96,8 +192,16 @@ function EndedState({ webinar, token }: { webinar: AttendData['webinar']; token:
 
 export default function AttendPage() {
   const { token } = useParams<{ token: string }>()
-  const pollInterval = useRef<number | null>(null)
+  const [searchParams] = useSearchParams()
+  const isHostView = searchParams.get('host') === '1'
 
+  const [viewerCount, setViewerCount] = useState(0)
+  const [chatEnabled, setChatEnabled] = useState(true)
+  const [chatMessages, setChatMessages] = useState<ChatEntry[]>([])
+  const [webinarEnded, setWebinarEnded] = useState(false)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Initial HTTP fetch — validates token, gets webinar state
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['attend', token],
     queryFn: async (): Promise<AttendData> => {
@@ -110,15 +214,108 @@ export default function AttendPage() {
     staleTime: 30_000,
   })
 
-  // Poll every 30s when webinar is PUBLISHED (waiting for LIVE)
+  // Build WS URL — only connect when webinar is LIVE
+  const isLive = data?.webinar.isLive ?? false
+  const webinarId = data?.webinar.id ?? null
+  const registrationId = data?.registration.id ?? null
+
+  const wsUrl = isLive && webinarId && registrationId && token
+    ? (isHostView
+        ? `/api/v1/ws/webinar/${webinarId}/ws/host`
+        : `/api/v1/ws/webinar/${webinarId}/ws?token=${token}`)
+    : null
+
+  // Convert relative WS URL to ws:// or wss://
+  const wsAbsoluteUrl = wsUrl
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
+    : null
+
+  const { lastMessage, readyState, sendMessage } = useWebSocket<WsMessage>(wsAbsoluteUrl)
+
+  // Handle incoming WS messages
   useEffect(() => {
-    if (data?.webinar.status === 'PUBLISHED') {
-      pollInterval.current = window.setInterval(() => { void refetch() }, 30_000)
+    if (!lastMessage) return
+
+    switch (lastMessage.type) {
+      case 'PARTICIPANT_COUNT':
+        setViewerCount(lastMessage.count ?? 0)
+        break
+
+      case 'ROOM_STATE':
+        setViewerCount(lastMessage.participantCount ?? 0)
+        setChatEnabled(lastMessage.chatEnabled ?? true)
+        break
+
+      case 'CHAT_MESSAGE':
+        if (lastMessage.id && lastMessage.content) {
+          setChatMessages((prev) => [
+            ...prev.slice(-199), // keep last 200 messages
+            {
+              id: lastMessage.id!,
+              name: lastMessage.participantName ?? 'Participant',
+              text: lastMessage.content!,
+              ts: lastMessage.timestamp,
+              isHost: (lastMessage.participantName ?? '').includes('(Host)'),
+            },
+          ])
+        }
+        break
+
+      case 'WEBINAR_ENDED':
+        setWebinarEnded(true)
+        break
+
+      default:
+        break
+    }
+  }, [lastMessage])
+
+  // Heartbeat every 30s to keep WS alive
+  useEffect(() => {
+    if (readyState !== 'OPEN' || !registrationId) return
+    const hb = setInterval(() => {
+      sendMessage({ type: 'HEARTBEAT', sessionId: isHostView ? `host:${registrationId}` : registrationId })
+    }, 30_000)
+    return () => clearInterval(hb)
+  }, [readyState, registrationId, isHostView, sendMessage])
+
+  // Poll HTTP every 30s when waiting for LIVE (before WS is established)
+  useEffect(() => {
+    if (data?.webinar.status === 'PUBLISHED' && !isLive) {
+      pollIntervalRef.current = setInterval(() => { void refetch() }, 30_000)
     }
     return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current)
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     }
-  }, [data?.webinar.status, refetch])
+  }, [data?.webinar.status, isLive, refetch])
+
+  const handleSendChat = useCallback((text: string) => {
+    sendMessage({
+      type: 'CHAT_SEND',
+      sessionId: registrationId ?? '',
+      content: text,
+    })
+  }, [sendMessage, registrationId])
+
+  const handleEndWebinar = useCallback(() => {
+    if (!confirm('End the webinar for all attendees?')) return
+    sendMessage({
+      type: 'END_WEBINAR',
+      sessionId: `host:${registrationId ?? ''}`,
+    })
+    // Also update server status via admin API
+    if (webinarId) {
+      const jwt = getAccessToken()
+      fetch(`/api/v1/admin/webinars/${webinarId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify({ action: 'end' }),
+      }).catch(() => console.warn('[Host] Failed to update server status'))
+    }
+  }, [sendMessage, registrationId, webinarId])
 
   if (isLoading) return <LoadingState label="Loading your session…" />
   if (error) {
@@ -134,6 +331,8 @@ export default function AttendPage() {
   if (!data) return null
 
   const { registration, webinar } = data
+  const showEnded = webinar.isEnded || webinarEnded
+  const showLive = (webinar.isLive || isLive) && !showEnded
 
   return (
     <div className="attend-page">
@@ -150,14 +349,11 @@ export default function AttendPage() {
             </p>
           </div>
           <div className="attend-header-right">
-            {webinar.isLive && (
-              <Badge variant="error" dot>LIVE</Badge>
-            )}
-            {webinar.isEnded && (
-              <Badge variant="secondary">Ended</Badge>
-            )}
-            {!webinar.isLive && !webinar.isEnded && (
-              <Badge variant="primary">Upcoming</Badge>
+            {showLive && <Badge variant="error" dot>LIVE</Badge>}
+            {showEnded && <Badge variant="secondary">Ended</Badge>}
+            {!showLive && !showEnded && <Badge variant="primary">Upcoming</Badge>}
+            {viewerCount > 0 && showLive && (
+              <span className="attend-viewer-count">👥 {viewerCount}</span>
             )}
           </div>
         </div>
@@ -165,7 +361,7 @@ export default function AttendPage() {
 
       {/* Main content */}
       <main className="attend-main">
-        {webinar.isLive && webinar.youtubeVideoId ? (
+        {showLive && webinar.youtubeVideoId ? (
           <div className="attend-live-layout">
             <div className="attend-stream-section">
               <YouTubeEmbed videoId={webinar.youtubeVideoId} autoplay />
@@ -173,25 +369,40 @@ export default function AttendPage() {
                 <h1 className="attend-stream-title">{webinar.title}</h1>
                 <p className="attend-stream-host">Hosted by {webinar.hostName}</p>
               </div>
+              {/* Host end-webinar control */}
+              {isHostView && (
+                <div className="attend-host-controls">
+                  <Button variant="secondary" size="sm" onClick={handleEndWebinar}>
+                    ⏹ End Webinar
+                  </Button>
+                  {readyState === 'OPEN'
+                    ? <span className="attend-host-status attend-host-status--connected">● Host connected</span>
+                    : <span className="attend-host-status attend-host-status--disconnected">○ Reconnecting…</span>
+                  }
+                </div>
+              )}
             </div>
             <aside className="attend-chat-sidebar">
               <div className="attend-chat-header">
-                <span>Live Q&A</span>
-                <Badge variant="success" dot>Active</Badge>
+                <span>Live Chat</span>
+                {readyState === 'OPEN'
+                  ? <Badge variant="success" dot>Active</Badge>
+                  : <Badge variant="secondary">Connecting…</Badge>
+                }
               </div>
-              <div className="attend-chat-body">
-                <p className="attend-chat-coming-soon">
-                  💬 Live chat will be enabled in a future update.
-                  <br /><br />
-                  Please use the YouTube chat directly.
-                </p>
-              </div>
+              <ChatPanel
+                messages={chatMessages}
+                sessionId={registrationId ?? ''}
+                onSend={handleSendChat}
+                chatEnabled={chatEnabled}
+                isConnected={readyState === 'OPEN'}
+              />
             </aside>
           </div>
-        ) : webinar.isEnded ? (
+        ) : showEnded ? (
           <EndedState webinar={webinar} token={token!} />
         ) : (
-          <WaitingRoom webinar={webinar} participantName={registration.name} />
+          <WaitingRoom webinar={webinar} participantName={registration.name} viewerCount={viewerCount} />
         )}
       </main>
     </div>

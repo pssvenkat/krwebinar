@@ -8,6 +8,7 @@ import { webinarAdminRoutes } from './routes/admin/webinars'
 import { registrationAdminRoutes } from './routes/admin/registrations'
 import { publicWebinarRoutes } from './routes/public/webinar'
 import { unsubscribeRoutes } from './routes/public/unsubscribe'
+import { wsRoutes } from './routes/attend/ws'
 import { tenantMiddleware } from './middleware/tenant'
 import { scheduled } from './scheduler'
 import type { Env, HonoVariables } from './types'
@@ -64,6 +65,9 @@ app.route('/api/v1/admin/webinars', registrationAdminRoutes)
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)
 app.route('/api/v1/attend', publicWebinarRoutes)
+
+// WebSocket routes (tenant-scoped — attendee token or JWT validated inside)
+app.route('/api/v1/ws/webinar', wsRoutes)
 
 // Unsubscribe (no auth, no tenant — keyed by access_token)
 app.route('/api/v1/unsubscribe', unsubscribeRoutes)
