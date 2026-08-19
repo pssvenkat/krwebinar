@@ -57,6 +57,16 @@ export default function PlatformTenantDetailPage() {
           <p className="leads-kpi-label">Leads</p>
           <p className="leads-kpi-value">{stats.leadCount}</p>
         </div>
+        <div className="leads-kpi">
+          <p className="leads-kpi-label">Trial / Plan Remaining</p>
+          <p className="leads-kpi-value" style={{ fontSize: '1.25rem' }}>
+            {tenant.status === 'trial'
+              ? `${Math.max(0, Math.ceil((new Date(tenant.created_at).getTime() + 14 * 86400 * 1000 - Date.now()) / (86400 * 1000)))} Days`
+              : tenant.status === 'active'
+                ? 'Active'
+                : 'Suspended'}
+          </p>
+        </div>
       </div>
 
       {/* Status controls */}

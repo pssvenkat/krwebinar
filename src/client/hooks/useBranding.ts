@@ -50,14 +50,22 @@ const CSS_VAR_MAP: Record<keyof TenantBranding, string | null> = {
   platformName:    null,
 }
 
-async function fetchPublicBranding(): Promise<TenantBranding> {
-  const res = await fetch('/api/v1/public/branding', { credentials: 'include' })
-  const json = await res.json() as { ok: boolean; data?: TenantBranding; error?: { message: string } }
-  if (!json.ok) throw new Error(json.error?.message ?? 'Failed to load branding')
-  return json.data!
+async function fetchPublicBranding(): Promise<TenantBranding | null> {
+  try {
+    const res = await fetch('/api/v1/public/branding', {
+      credentials: 'include',
+      headers: { 'X-Tenant-Slug': 'krave' },
+    })
+    const json = (await res.json()) as { ok: boolean; data?: TenantBranding; error?: { message: string } }
+    if (!json.ok || !json.data) return null
+    return json.data
+  } catch {
+    return null
+  }
 }
 
-function applyBrandingToRoot(branding: TenantBranding) {
+function applyBrandingToRoot(branding: TenantBranding | null | undefined) {
+  if (!branding || typeof branding !== 'object') return
   const root = document.documentElement
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
     if (!cssVar) continue

@@ -70,7 +70,7 @@ const registerSchema = z.object({
   email: z.string().email('Enter a valid email address'),
   phone: z.string().optional(),
   countryCode: z.string().optional(),
-  city: z.string().optional(),
+  city: z.string().min(2, 'City is required'),
   consentMarketing: z.boolean().optional(),
 })
 
@@ -414,12 +414,14 @@ export default function RegisterPage() {
                 />
                 <Input
                   id="reg-city"
-                  label="City (optional)"
+                  label="City"
                   type="text"
                   autoComplete="address-level2"
                   placeholder="Coimbatore"
                   value={formData.city ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData((f) => ({ ...f, city: e.target.value }))}
+                  error={errors.city}
+                  required
                 />
               </div>
             </div>

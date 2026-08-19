@@ -22,13 +22,17 @@ const AdminLoginPage             = lazy(() => import('./pages/admin/AdminLoginPa
 const AdminWebinarListPage       = lazy(() => import('./pages/admin/AdminWebinarListPage'))
 const AdminWebinarFormPage       = lazy(() => import('./pages/admin/AdminWebinarFormPage'))
 const AdminWebinarDetailPage     = lazy(() => import('./pages/admin/AdminWebinarDetailPage'))
+const AdminRegistrationsPage     = lazy(() => import('./pages/admin/AdminRegistrationsPage'))
+const AdminLeadsPage             = lazy(() => import('./pages/admin/AdminLeadsPage'))
 // Phase 9: Analytics pages (lazy-loaded)
 const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyticsPage'))
 const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
 // Phase 10: Branding page (lazy-loaded)
 const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
-// Phase 12: Platform admin pages (lazy-loaded)
-const PlatformLayout             = lazy(() => import('./pages/platform/PlatformLayout'))
+const AdminProfilePage           = lazy(() => import('./pages/admin/AdminProfilePage'))
+const AdminPrivacyPage           = lazy(() => import('./pages/admin/AdminPrivacyPage'))
+// Phase 12 & 14: Platform admin pages (lazy-loaded)
+const PlatformDashboardPage    = lazy(() => import('./pages/platform/PlatformDashboardPage'))
 const PlatformTenantsPage        = lazy(() => import('./pages/platform/PlatformTenantsPage'))
 const PlatformTenantFormPage     = lazy(() => import('./pages/platform/PlatformTenantFormPage'))
 const PlatformTenantDetailPage   = lazy(() => import('./pages/platform/PlatformTenantDetailPage'))
@@ -83,12 +87,17 @@ export default function App() {
             <Route path="webinars/:id" element={<AdminWebinarDetailPage />} />
             <Route path="webinars/:id/edit" element={<AdminWebinarFormPage />} />
             <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
+            <Route path="registrations" element={<AdminRegistrationsPage />} />
+            <Route path="participants" element={<AdminRegistrationsPage />} />
+            <Route path="leads" element={<AdminLeadsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="profile" element={<AdminProfilePage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
             <Route path="domains" element={<AdminDomainsPage />} />
+            <Route path="privacy" element={<AdminPrivacyPage />} />
           </Route>
 
-          {/* ── Phase 12: Platform admin routes (PLATFORM_OWNER) ── */}
+          {/* ── Phase 12 & 14: Platform admin routes (PLATFORM_OWNER) ── */}
           <Route
             path="/platform"
             element={
@@ -97,7 +106,7 @@ export default function App() {
               </RequireAuth>
             }
           >
-            <Route index element={<PlatformTenantsPage />} />
+            <Route index element={<PlatformDashboardPage />} />
             <Route path="tenants" element={<PlatformTenantsPage />} />
             <Route path="tenants/new" element={<PlatformTenantFormPage />} />
             <Route path="tenants/:id" element={<PlatformTenantDetailPage />} />

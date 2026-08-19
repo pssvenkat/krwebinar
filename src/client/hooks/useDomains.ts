@@ -28,6 +28,7 @@ async function authFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'X-Tenant-Slug': 'krave',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options?.headers as Record<string, string> ?? {}),
     },

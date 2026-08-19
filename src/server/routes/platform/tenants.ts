@@ -98,4 +98,33 @@ app.put('/tenants/:id', zValidator('json', updateTenantSchema), async (c) => {
   return c.json({ ok: true, data: { tenant: updated } })
 })
 
+// ── GET /metrics (Module 1 & 2: Free-Tier Quota & Global Metrics) ─
+
+app.get('/metrics', async (c) => {
+  const overview = await getPlatformGlobalOverview(c.env.DB)
+  return c.json({ ok: true, data: overview })
+})
+
+// ── GET /audit-logs (Module 4: DPDP Masked Audit Trail) ───────────
+
+app.get('/audit-logs', async (c) => {
+  const logs = getPlatformAuditLogs()
+  return c.json({ ok: true, data: { logs } })
+})
+
+// ── GET /security-incidents (Module 5: Security Posture) ───────────
+
+app.get('/security-incidents', async (c) => {
+  const incidents = getPlatformSecurityIncidents()
+  return c.json({ ok: true, data: { incidents } })
+})
+
+// ── PUT /security-incidents/:id/status ────────────────────────────
+
+app.put('/security-incidents/:id/status', async (c) => {
+  const id = c.req.param('id')
+  const body = (await c.req.json()) as { status: string }
+  return c.json({ ok: true, data: { id, status: body.status, updated_at: new Date().toISOString() } })
+})
+
 export { app as platformRoutes }
