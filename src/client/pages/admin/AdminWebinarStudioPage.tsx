@@ -992,53 +992,72 @@ export default function AdminWebinarStudioPage() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
                       {q.isAnswered ? (
-                        <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600 }}>✓ Answered Live</span>
+                        <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          ✓ Answered Live
+                        </span>
                       ) : (
-                        <>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleMarkAnswered(q.id)}
-                          >
-                            ✓ Mark Answered
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setAnsweringQuestionId(q.id)
-                              setAnswerDraft('')
-                            }}
-                          >
-                            Type Answer
-                          </Button>
-                        </>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleMarkAnswered(q.id)}
+                        >
+                          ✓ Mark Answered
+                        </Button>
                       )}
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setAnsweringQuestionId(answeringQuestionId === q.id ? null : q.id)
+                          setAnswerDraft(q.answerText || '')
+                        }}
+                      >
+                        {q.answerText ? '✏️ Edit Answer' : '💬 Type Answer'}
+                      </Button>
                     </div>
 
                     {answeringQuestionId === q.id && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSubmitAnswer(q.id)
+                        }}
+                        style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}
+                      >
                         <input
                           type="text"
-                          placeholder="Type answer to publish to attendee…"
+                          placeholder="Type answer to publish to all attendees (press Enter to send)…"
                           value={answerDraft}
+                          autoFocus
                           onChange={(e) => setAnswerDraft(e.target.value)}
                           style={{
                             flex: 1,
-                            padding: '0.4rem 0.5rem',
+                            padding: '0.45rem 0.6rem',
                             background: '#1e293b',
-                            border: '1px solid #334155',
+                            border: '1px solid #38bdf8',
                             borderRadius: '6px',
                             color: '#fff',
                             fontSize: '0.8rem',
                           }}
                         />
-                        <Button variant="primary" size="sm" onClick={() => handleSubmitAnswer(q.id)}>
-                          Reply
+                        <Button type="submit" variant="primary" size="sm" disabled={!answerDraft.trim()}>
+                          Send Reply
                         </Button>
-                      </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setAnsweringQuestionId(null)
+                            setAnswerDraft('')
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </form>
                     )}
                   </div>
                 ))
