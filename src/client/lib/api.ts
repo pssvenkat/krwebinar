@@ -56,27 +56,37 @@ async function _fetch<T>(path: string, options: FetchOptions = {}): Promise<ApiR
   // Dev: inject tenant slug via header (defaults to krave)
   headers['X-Tenant-Slug'] = tenantSlug || headers['X-Tenant-Slug'] || 'krave'
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...rest,
-    headers,
-    credentials: 'include',   // sends httpOnly refresh cookie
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...rest,
+      headers,
+      credentials: 'include',   // sends httpOnly refresh cookie
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
 
-  // Silent token refresh on 401
-  if (res.status === 401 && !skipRefresh && !skipAuth) {
-    const refreshed = await _silentRefresh()
-    if (refreshed) {
-      // Retry with new token
-      return _fetch<T>(path, { ...options, skipRefresh: true })
-    } else {
-      _onUnauthorized?.()
-      return { ok: false, error: { code: 'SESSION_EXPIRED', message: 'Your session has expired. Please log in again.' } }
+    // Silent token refresh on 401
+    if (res.status === 401 && !skipRefresh && !skipAuth) {
+      const refreshed = await _silentRefresh()
+      if (refreshed) {
+        // Retry with new token
+        return _fetch<T>(path, { ...options, skipRefresh: true })
+      } else {
+        _onUnauthorized?.()
+        return { ok: false, error: { code: 'SESSION_EXPIRED', message: 'Your session has expired. Please log in again.' } }
+      }
+    }
+
+    const json = (await res.json()) as ApiResult<T>
+    return json
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Network error',
+      },
     }
   }
-
-  const json = await res.json() as ApiResult<T>
-  return json
 }
 
 async function _silentRefresh(): Promise<boolean> {
