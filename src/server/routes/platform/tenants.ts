@@ -21,6 +21,9 @@ import {
   getPlatformTenantById,
   updatePlatformTenantStatus,
   getPlatformTenantStats,
+  getPlatformGlobalOverview,
+  getPlatformAuditLogs,
+  getPlatformSecurityIncidents,
 } from '../../lib/db'
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()

@@ -2,52 +2,8 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Button } from '../../components/ui/Button'
-import { getAccessToken } from '../../lib/api'
-
-// ── Types ─────────────────────────────────────────────────────────
-
-interface BrandingData {
-  primary_color: string
-  secondary_color: string
-  accent_color: string
-  background_color: string
-  surface_color: string
-  text_color: string
-  muted_color: string
-  border_color: string
-  success_color: string
-  warning_color: string
-  error_color: string
-  font_heading: string
-  font_body: string
-  logo_url: string | null
-  favicon_url: string | null
-}
-
-interface SettingsData {
-  max_webinars: number
-  max_participants: number
-  chat_rate_limit_messages: number
-  chat_rate_limit_window_seconds: number
-}
-
-// ── Fetch helpers ─────────────────────────────────────────────────
-
-async function authFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getAccessToken()
-  const res = await fetch(path, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options?.headers ?? {}),
-    },
-  })
-  const json = await res.json() as { ok: boolean; data?: T; error?: { message: string } }
-  if (!json.ok) throw new Error(json.error?.message ?? 'Request failed')
-  return json.data!
-}
+import { api } from '../../lib/api'
+import type { BrandingData, SettingsData } from '../../lib/api'
 
 // ── Color swatch ──────────────────────────────────────────────────
 
@@ -133,13 +89,21 @@ export default function AdminBrandingPage() {
   // Load current branding + settings
   const { data: branding, isLoading: bLoading, error: bError } = useQuery({
     queryKey: ['admin', 'branding'],
-    queryFn: () => authFetch<BrandingData>('/api/v1/admin/branding'),
+    queryFn: async () => {
+      const res = await api.branding.get()
+      if (!res.ok) throw new Error(res.error.message)
+      return res.data
+    },
     staleTime: 60_000,
   })
 
   const { data: settings, isLoading: sLoading, error: sError } = useQuery({
     queryKey: ['admin', 'settings'],
-    queryFn: () => authFetch<SettingsData>('/api/v1/admin/settings'),
+    queryFn: async () => {
+      const res = await api.settings.get()
+      if (!res.ok) throw new Error(res.error.message)
+      return res.data
+    },
     staleTime: 60_000,
   })
 
@@ -165,14 +129,23 @@ export default function AdminBrandingPage() {
 
   // Save mutations
   const brandingMutation = useMutation({
-    mutationFn: (data: Partial<BrandingData>) =>
-      authFetch('/api/v1/admin/branding', { method: 'PUT', body: JSON.stringify(data) }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['admin', 'branding'] }); void qc.invalidateQueries({ queryKey: ['public', 'branding'] }) },
+    mutationFn: async (data: Partial<BrandingData>) => {
+      const res = await api.branding.update(data)
+      if (!res.ok) throw new Error(res.error.message)
+      return res.data
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'branding'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'branding'] })
+    },
   })
 
   const settingsMutation = useMutation({
-    mutationFn: (data: Partial<SettingsData>) =>
-      authFetch('/api/v1/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    mutationFn: async (data: Partial<SettingsData>) => {
+      const res = await api.settings.update(data)
+      if (!res.ok) throw new Error(res.error.message)
+      return res.data
+    },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'settings'] }),
   })
 

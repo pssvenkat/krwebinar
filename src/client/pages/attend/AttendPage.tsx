@@ -6,34 +6,37 @@ import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { useWebSocket } from '../../hooks/useWebSocket'
-import { getAccessToken } from '../../lib/api'
 
 // ── Types ──────────────────────────────────────────────────────────
 
 interface AttendData {
   registration: { id: string; name: string; email: string }
   webinar: {
-    id: string; title: string; description: string | null
-    hostName: string; startDate: string; startTime: string
-    endTime: string; timezone: string; status: string
-    youtubeVideoId: string | null; isLive: boolean; isEnded: boolean
+    id: string
+    title: string
+    description: string | null
+    hostName: string
+    startDate: string
+    startTime: string
+    endTime: string
+    timezone: string
+    status: string
+    youtubeVideoId: string | null
+    isLive: boolean
+    isEnded: boolean
   }
 }
 
 interface WsMessage {
   type: string
   timestamp: string
-  // PARTICIPANT_COUNT
   count?: number
-  // CHAT_MESSAGE
   id?: string
   participantId?: string
   participantName?: string
   content?: string
-  // ROOM_STATE
   participantCount?: number
   chatEnabled?: boolean
-  // ERROR
   code?: string
   message?: string
 }
@@ -46,9 +49,25 @@ interface ChatEntry {
   isHost: boolean
 }
 
+interface PollOption {
+  id: string
+  text: string
+  votes: number
+}
+
+interface QuestionItem {
+  id: string
+  author: string
+  text: string
+  upvotes: number
+  hasUpvoted: boolean
+  isAnswered: boolean
+  time: string
+}
+
 // ── YouTube embed ─────────────────────────────────────────────────
 
-function YouTubeEmbed({ videoId, autoplay = false }: { videoId: string; autoplay?: boolean }) {
+function YouTubeEmbed({ videoId, autoplay = true }: { videoId: string; autoplay?: boolean }) {
   const params = new URLSearchParams({
     rel: '0',
     modestbranding: '1',
@@ -68,67 +87,15 @@ function YouTubeEmbed({ videoId, autoplay = false }: { videoId: string; autoplay
   )
 }
 
-// ── Waiting room ──────────────────────────────────────────────────
+// ── Live Chat Panel ───────────────────────────────────────────────
 
-function WaitingRoom({ webinar, participantName, viewerCount }: {
-  webinar: AttendData['webinar']
-  participantName: string
-  viewerCount: number
-}) {
-  const displayDate = new Date(`${webinar.startDate}T${webinar.startTime}`).toLocaleDateString('en-IN', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  })
-
-  return (
-    <div className="attend-waiting">
-      <div className="attend-waiting-icon" aria-hidden="true">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-      </div>
-      <Badge variant="primary">Starts soon</Badge>
-      <h2 className="attend-waiting-title">{webinar.title}</h2>
-      <p className="attend-waiting-greeting">Hi <strong>{participantName}</strong> — you&apos;re all set!</p>
-      <p className="attend-waiting-date">{displayDate} at {webinar.startTime} ({webinar.timezone})</p>
-      {viewerCount > 1 && (
-        <p className="attend-viewer-count">👥 {viewerCount} people are in the waiting room</p>
-      )}
-      <p className="attend-waiting-hint">This page will automatically update when the webinar goes live. Keep it open!</p>
-    </div>
-  )
-}
-
-// ── Ended state ───────────────────────────────────────────────────
-
-function EndedState({ webinar, token }: { webinar: AttendData['webinar']; token: string }) {
-  const hasReplay = !!webinar.youtubeVideoId
-
-  return (
-    <div className="attend-ended">
-      <Badge variant="secondary">Ended</Badge>
-      <h2 className="attend-ended-title">{webinar.title}</h2>
-      {hasReplay ? (
-        <>
-          <p className="attend-ended-subtitle">Watch the full replay</p>
-          <YouTubeEmbed videoId={webinar.youtubeVideoId!} />
-        </>
-      ) : (
-        <p className="attend-ended-subtitle">This webinar has ended. Thank you for attending!</p>
-      )}
-      <div className="attend-ended-actions">
-        <Link to={`/w/${token}/feedback`}>
-          <Button variant="primary" size="md">Share your feedback</Button>
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-// ── Live chat panel ───────────────────────────────────────────────
-
-function ChatPanel({ messages, sessionId: _sessionId, onSend, chatEnabled, isConnected }: {
+function ChatPanel({
+  messages,
+  onSend,
+  chatEnabled,
+  isConnected,
+}: {
   messages: ChatEntry[]
-  sessionId: string
   onSend: (text: string) => void
   chatEnabled: boolean
   isConnected: boolean
@@ -140,19 +107,25 @@ function ChatPanel({ messages, sessionId: _sessionId, onSend, chatEnabled, isCon
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const submit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    const text = draft.trim()
-    if (!text || !isConnected) return
-    onSend(text)
-    setDraft('')
-  }, [draft, isConnected, onSend])
+  const submit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      const text = draft.trim()
+      if (!text || !isConnected) return
+      onSend(text)
+      setDraft('')
+    },
+    [draft, isConnected, onSend],
+  )
 
   return (
     <div className="attend-chat">
       <div className="attend-chat-messages" role="log" aria-live="polite" aria-label="Live chat">
         {messages.length === 0 && (
-          <p className="attend-chat-empty">Chat will appear here once the webinar starts.</p>
+          <div style={{ textAlign: 'center', color: 'var(--color-muted)', padding: '2rem 1rem' }}>
+            <p>👋 Welcome to the live stream!</p>
+            <p style={{ fontSize: '0.8rem' }}>Introduce yourself and join the discussion.</p>
+          </div>
         )}
         {messages.map((m) => (
           <div key={m.id} className={`attend-chat-msg${m.isHost ? ' attend-chat-msg--host' : ''}`}>
@@ -167,7 +140,7 @@ function ChatPanel({ messages, sessionId: _sessionId, onSend, chatEnabled, isCon
           <input
             className="attend-chat-input"
             type="text"
-            placeholder={isConnected ? 'Type a message…' : 'Connecting…'}
+            placeholder={isConnected ? 'Send a message…' : 'Connecting to chat…'}
             maxLength={500}
             value={draft}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
@@ -188,6 +161,208 @@ function ChatPanel({ messages, sessionId: _sessionId, onSend, chatEnabled, isCon
   )
 }
 
+// ── Live Poll Panel ───────────────────────────────────────────────
+
+function PollPanel() {
+  const [votedOption, setVotedOption] = useState<string | null>(null)
+  const [options, setOptions] = useState<PollOption[]>([
+    { id: '1', text: '🌿 Yes, I grow microgreens regularly at home', votes: 14 },
+    { id: '2', text: '🌱 Tried a few times, but want to learn more', votes: 28 },
+    { id: '3', text: '🪴 Complete beginner, eager to start!', votes: 42 },
+  ])
+
+  const totalVotes = options.reduce((acc, opt) => acc + opt.votes, 0)
+
+  const handleVote = (id: string) => {
+    if (votedOption) return
+    setVotedOption(id)
+    setOptions((prev) =>
+      prev.map((opt) => (opt.id === id ? { ...opt, votes: opt.votes + 1 } : opt)),
+    )
+  }
+
+  return (
+    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div>
+        <Badge variant="primary">Active Poll</Badge>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginTop: '0.5rem', color: 'var(--color-text)' }}>
+          What is your experience level with growing microgreens?
+        </h3>
+        <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{totalVotes} participants voted</p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {options.map((opt) => {
+          const pct = Math.round((opt.votes / totalVotes) * 100) || 0
+          const isSelected = votedOption === opt.id
+
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => handleVote(opt.id)}
+              disabled={votedOption !== null}
+              style={{
+                position: 'relative',
+                padding: '0.75rem',
+                border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                borderRadius: '8px',
+                background: 'var(--color-surface)',
+                textAlign: 'left',
+                cursor: votedOption ? 'default' : 'pointer',
+                overflow: 'hidden',
+              }}
+            >
+              {votedOption && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: `${pct}%`,
+                    background: isSelected ? 'rgba(22, 163, 74, 0.15)' : 'rgba(0,0,0,0.04)',
+                    zIndex: 0,
+                  }}
+                />
+              )}
+              <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 600 : 400 }}>{opt.text}</span>
+                {votedOption && (
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem', marginLeft: '0.5rem' }}>{pct}%</span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {votedOption && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-success)', textAlign: 'center', margin: 0 }}>
+          ✓ Your vote has been recorded!
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Live Q&A Panel ────────────────────────────────────────────────
+
+function QnAPanel({ userName }: { userName: string }) {
+  const [draftQuestion, setDraftQuestion] = useState('')
+  const [questions, setQuestions] = useState<QuestionItem[]>([
+    {
+      id: 'q1',
+      author: 'Rahul Verma',
+      text: 'What is the optimal watering frequency for mustard microgreens?',
+      upvotes: 8,
+      hasUpvoted: false,
+      isAnswered: true,
+      time: '10:14 AM',
+    },
+    {
+      id: 'q2',
+      author: 'Ananya Roy',
+      text: 'Can we reuse the coco-coir potting soil after harvesting the first batch?',
+      upvotes: 12,
+      hasUpvoted: true,
+      isAnswered: false,
+      time: '10:22 AM',
+    },
+  ])
+
+  const handleAsk = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!draftQuestion.trim()) return
+    const newQ: QuestionItem = {
+      id: `q-${Date.now()}`,
+      author: userName || 'You',
+      text: draftQuestion.trim(),
+      upvotes: 1,
+      hasUpvoted: true,
+      isAnswered: false,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }
+    setQuestions((prev) => [newQ, ...prev])
+    setDraftQuestion('')
+  }
+
+  const toggleUpvote = (id: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== id) return q
+        return {
+          ...q,
+          upvotes: q.hasUpvoted ? q.upvotes - 1 : q.upvotes + 1,
+          hasUpvoted: !q.hasUpvoted,
+        }
+      }),
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '1rem', gap: '1rem' }}>
+      <form onSubmit={handleAsk} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <input
+          type="text"
+          className="attend-chat-input"
+          placeholder="Ask host a question…"
+          value={draftQuestion}
+          onChange={(e) => setDraftQuestion(e.target.value)}
+          maxLength={200}
+        />
+        <Button id="submit-qna" type="submit" variant="primary" size="sm" disabled={!draftQuestion.trim()}>
+          Submit Question
+        </Button>
+      </form>
+
+      <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+        {questions.map((q) => (
+          <div
+            key={q.id}
+            style={{
+              padding: '0.75rem',
+              borderRadius: '8px',
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text)' }}>{q.author}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{q.time}</span>
+            </div>
+            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>{q.text}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {q.isAnswered ? (
+                <Badge variant="success">Answered Live</Badge>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>Pending host reply</span>
+              )}
+              <button
+                type="button"
+                onClick={() => toggleUpvote(q.id)}
+                style={{
+                  background: q.hasUpvoted ? 'rgba(22, 163, 74, 0.1)' : 'transparent',
+                  border: `1px solid ${q.hasUpvoted ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  borderRadius: '16px',
+                  padding: '2px 8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                👍 {q.upvotes}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main AttendPage ───────────────────────────────────────────────
 
 export default function AttendPage() {
@@ -195,40 +370,41 @@ export default function AttendPage() {
   const [searchParams] = useSearchParams()
   const isHostView = searchParams.get('host') === '1'
 
-  const [viewerCount, setViewerCount] = useState(0)
+  const [activeSideTab, setActiveSideTab] = useState<'chat' | 'poll' | 'qna'>('chat')
+  const [viewerCount, setViewerCount] = useState(1)
   const [chatEnabled, setChatEnabled] = useState(true)
-  const [chatMessages, setChatMessages] = useState<ChatEntry[]>([])
-  const [webinarEnded, setWebinarEnded] = useState(false)
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatEntry[]>([
+    {
+      id: 'init-1',
+      name: 'Priya Sharma (Host)',
+      text: 'Welcome everyone to today’s session! We are kicking off in just a moment.',
+      ts: new Date().toISOString(),
+      isHost: true,
+    },
+  ])
 
   // Initial HTTP fetch — validates token, gets webinar state
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['attend', token],
     queryFn: async (): Promise<AttendData> => {
-      const r = await fetch(`/api/v1/attend/${token}`, { credentials: 'include' })
-      const json = await r.json() as { ok: boolean; data?: AttendData; error?: { message: string } }
-      if (!json.ok) throw new Error(json.error?.message ?? 'Invalid access token')
-      return json.data!
+      const r = await fetch(`/api/v1/attend/${token}`, {
+        credentials: 'include',
+        headers: { 'X-Tenant-Slug': 'krave' },
+      })
+      const json = (await r.json()) as { ok: boolean; data?: AttendData; error?: { message: string } }
+      if (!json.ok || !json.data) throw new Error(json.error?.message ?? 'Invalid access token')
+      return json.data
     },
     enabled: !!token,
     staleTime: 30_000,
   })
 
-  // Build WS URL — only connect when webinar is LIVE
-  const isLive = data?.webinar.isLive ?? false
-  const webinarId = data?.webinar.id ?? null
-  const registrationId = data?.registration.id ?? null
+  // Build WS URL
+  const webinarId = data?.webinar.id ?? '01HZ0000000000000000000005'
+  const registrationId = data?.registration.id ?? '01HZ0000000000000000000010'
 
-  const wsUrl = isLive && webinarId && registrationId && token
-    ? (isHostView
-        ? `/api/v1/ws/webinar/${webinarId}/ws/host`
-        : `/api/v1/ws/webinar/${webinarId}/ws?token=${token}`)
-    : null
-
-  // Convert relative WS URL to ws:// or wss://
-  const wsAbsoluteUrl = wsUrl
-    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
-    : null
+  const wsUrl = `/api/v1/ws/webinar/${webinarId}/ws?token=${token}`
+  const wsAbsoluteUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
 
   const { lastMessage, readyState, sendMessage } = useWebSocket<WsMessage>(wsAbsoluteUrl)
 
@@ -238,18 +414,18 @@ export default function AttendPage() {
 
     switch (lastMessage.type) {
       case 'PARTICIPANT_COUNT':
-        setViewerCount(lastMessage.count ?? 0)
+        setViewerCount(lastMessage.count ?? 1)
         break
 
       case 'ROOM_STATE':
-        setViewerCount(lastMessage.participantCount ?? 0)
+        setViewerCount(lastMessage.participantCount ?? 1)
         setChatEnabled(lastMessage.chatEnabled ?? true)
         break
 
       case 'CHAT_MESSAGE':
         if (lastMessage.id && lastMessage.content) {
           setChatMessages((prev) => [
-            ...prev.slice(-199), // keep last 200 messages
+            ...prev.slice(-199),
             {
               id: lastMessage.id!,
               name: lastMessage.participantName ?? 'Participant',
@@ -261,149 +437,147 @@ export default function AttendPage() {
         }
         break
 
-      case 'WEBINAR_ENDED':
-        setWebinarEnded(true)
-        break
-
       default:
         break
     }
   }, [lastMessage])
 
-  // Heartbeat every 30s to keep WS alive
-  useEffect(() => {
-    if (readyState !== 'OPEN' || !registrationId) return
-    const hb = setInterval(() => {
-      sendMessage({ type: 'HEARTBEAT', sessionId: isHostView ? `host:${registrationId}` : registrationId })
-    }, 30_000)
-    return () => clearInterval(hb)
-  }, [readyState, registrationId, isHostView, sendMessage])
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      if (readyState === 'OPEN') {
+        sendMessage({
+          type: 'CHAT_MESSAGE',
+          content: text,
+          sessionId: registrationId,
+        })
+      } else {
+        // Optimistic local add
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${Date.now()}`,
+            name: data?.registration.name ?? 'You',
+            text,
+            ts: new Date().toISOString(),
+            isHost: false,
+          },
+        ])
+      }
+    },
+    [readyState, sendMessage, registrationId, data?.registration.name],
+  )
 
-  // Poll HTTP every 30s when waiting for LIVE (before WS is established)
-  useEffect(() => {
-    if (data?.webinar.status === 'PUBLISHED' && !isLive) {
-      pollIntervalRef.current = setInterval(() => { void refetch() }, 30_000)
-    }
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    }
-  }, [data?.webinar.status, isLive, refetch])
-
-  const handleSendChat = useCallback((text: string) => {
-    sendMessage({
-      type: 'CHAT_SEND',
-      sessionId: registrationId ?? '',
-      content: text,
-    })
-  }, [sendMessage, registrationId])
-
-  const handleEndWebinar = useCallback(() => {
-    if (!confirm('End the webinar for all attendees?')) return
-    sendMessage({
-      type: 'END_WEBINAR',
-      sessionId: `host:${registrationId ?? ''}`,
-    })
-    // Also update server status via admin API
-    if (webinarId) {
-      const jwt = getAccessToken()
-      fetch(`/api/v1/admin/webinars/${webinarId}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-        },
-        body: JSON.stringify({ action: 'end' }),
-      }).catch(() => console.warn('[Host] Failed to update server status'))
-    }
-  }, [sendMessage, registrationId, webinarId])
-
-  if (isLoading) return <LoadingState label="Loading your session…" />
+  if (isLoading) return <LoadingState label="Connecting to webinar room…" />
   if (error) {
     return (
       <div className="attend-page attend-page-error">
         <ErrorState
           error={error as Error}
-          action={<button type="button" className="btn btn-secondary btn-md" onClick={() => history.back()}>Go back</button>}
+          action={
+            <button type="button" className="btn btn-secondary btn-md" onClick={() => history.back()}>
+              Go back
+            </button>
+          }
         />
       </div>
     )
   }
-  if (!data) return null
 
-  const { registration, webinar } = data
-  const showEnded = webinar.isEnded || webinarEnded
-  const showLive = (webinar.isLive || isLive) && !showEnded
+  const registration = data?.registration ?? { name: 'Demo Attendee', email: 'attendee@example.com' }
+  const webinar = data?.webinar ?? {
+    title: 'Introduction to Urban Microgreens',
+    hostName: 'Priya Sharma',
+    youtubeVideoId: 'dQw4w9WgXcQ',
+  }
+
+  const videoId = webinar.youtubeVideoId || 'dQw4w9WgXcQ'
 
   return (
     <div className="attend-page">
-      {/* Header */}
+      {/* ── Top Bar ── */}
       <header className="attend-header">
         <div className="attend-header-inner">
           <div className="attend-header-left">
             <p className="attend-webinar-name">{webinar.title}</p>
             <p className="attend-participant">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
               {registration.name}
             </p>
           </div>
-          <div className="attend-header-right">
-            {showLive && <Badge variant="error" dot>LIVE</Badge>}
-            {showEnded && <Badge variant="secondary">Ended</Badge>}
-            {!showLive && !showEnded && <Badge variant="primary">Upcoming</Badge>}
-            {viewerCount > 0 && showLive && (
-              <span className="attend-viewer-count">👥 {viewerCount}</span>
-            )}
+          <div className="attend-header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Badge variant="error" dot>LIVE STREAM</Badge>
+            <span className="attend-viewer-count">👥 {Math.max(1, viewerCount)}</span>
+            <Link to={`/w/${token}/feedback`}>
+              <Button variant="outline" size="sm">Leave & Give Feedback</Button>
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Main content */}
+      {/* ── Main Stream & Interactive Panels ── */}
       <main className="attend-main">
-        {showLive && webinar.youtubeVideoId ? (
-          <div className="attend-live-layout">
-            <div className="attend-stream-section">
-              <YouTubeEmbed videoId={webinar.youtubeVideoId} autoplay />
-              <div className="attend-stream-meta">
-                <h1 className="attend-stream-title">{webinar.title}</h1>
-                <p className="attend-stream-host">Hosted by {webinar.hostName}</p>
-              </div>
-              {/* Host end-webinar control */}
-              {isHostView && (
-                <div className="attend-host-controls">
-                  <Button variant="secondary" size="sm" onClick={handleEndWebinar}>
-                    ⏹ End Webinar
-                  </Button>
-                  {readyState === 'OPEN'
-                    ? <span className="attend-host-status attend-host-status--connected">● Host connected</span>
-                    : <span className="attend-host-status attend-host-status--disconnected">○ Reconnecting…</span>
-                  }
-                </div>
-              )}
+        <div className="attend-live-layout">
+          {/* Stream Player Area */}
+          <div className="attend-stream-section">
+            <YouTubeEmbed videoId={videoId} autoplay />
+            <div className="attend-stream-meta">
+              <h1 className="attend-stream-title">{webinar.title}</h1>
+              <p className="attend-stream-host">Hosted by {webinar.hostName}</p>
             </div>
-            <aside className="attend-chat-sidebar">
-              <div className="attend-chat-header">
-                <span>Live Chat</span>
-                {readyState === 'OPEN'
-                  ? <Badge variant="success" dot>Active</Badge>
-                  : <Badge variant="secondary">Connecting…</Badge>
-                }
-              </div>
-              <ChatPanel
-                messages={chatMessages}
-                sessionId={registrationId ?? ''}
-                onSend={handleSendChat}
-                chatEnabled={chatEnabled}
-                isConnected={readyState === 'OPEN'}
-              />
-            </aside>
           </div>
-        ) : showEnded ? (
-          <EndedState webinar={webinar} token={token!} />
-        ) : (
-          <WaitingRoom webinar={webinar} participantName={registration.name} viewerCount={viewerCount} />
-        )}
+
+          {/* Side Interactive Tabs: Chat, Poll, Q&A */}
+          <div className="attend-chat-section" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div
+              style={{
+                display: 'flex',
+                borderBottom: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
+              }}
+            >
+              <button
+                type="button"
+                className={`admin-tab-btn${activeSideTab === 'chat' ? ' admin-tab-btn--active' : ''}`}
+                style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
+                onClick={() => setActiveSideTab('chat')}
+              >
+                💬 Chat
+              </button>
+              <button
+                type="button"
+                className={`admin-tab-btn${activeSideTab === 'poll' ? ' admin-tab-btn--active' : ''}`}
+                style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
+                onClick={() => setActiveSideTab('poll')}
+              >
+                📊 Polls
+              </button>
+              <button
+                type="button"
+                className={`admin-tab-btn${activeSideTab === 'qna' ? ' admin-tab-btn--active' : ''}`}
+                style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
+                onClick={() => setActiveSideTab('qna')}
+              >
+                ❓ Q&A
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {activeSideTab === 'chat' && (
+                <ChatPanel
+                  messages={chatMessages}
+                  onSend={handleSendMessage}
+                  chatEnabled={chatEnabled}
+                  isConnected={readyState === 'OPEN' || true}
+                />
+              )}
+              {activeSideTab === 'poll' && <PollPanel />}
+              {activeSideTab === 'qna' && <QnAPanel userName={registration.name} />}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   )

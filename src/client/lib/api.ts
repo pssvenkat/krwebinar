@@ -41,7 +41,7 @@ interface FetchOptions extends Omit<RequestInit, 'body'> {
   skipRefresh?: boolean   // prevent infinite loop on refresh call
 }
 
-async function _fetch<T>(path: string, options: FetchOptions = {}): Promise<ApiResult<T>> {
+export async function _fetch<T>(path: string, options: FetchOptions = {}): Promise<ApiResult<T>> {
   const { body, tenantSlug, skipAuth, skipRefresh, ...rest } = options
 
   const headers: Record<string, string> = {
@@ -95,7 +95,7 @@ async function _silentRefresh(): Promise<boolean> {
       method: 'POST',
       credentials: 'include',
     })
-    const json = await res.json() as ApiResult<{ accessToken: string }>
+    const json = (await res.json()) as ApiResult<{ accessToken: string }>
     if (json.ok) {
       setAccessToken(json.data.accessToken)
       return true
@@ -164,6 +164,37 @@ export const api = {
     end: (id: string) =>
       _fetch<{ webinar: WebinarDetail }>(`/admin/webinars/${id}/end`, { method: 'POST' }),
   },
+
+  // Analytics
+  analytics: {
+    platform: () =>
+      _fetch<PlatformAnalytics>('/admin/analytics'),
+    webinar: (id: string) =>
+      _fetch<WebinarAnalytics>(`/admin/webinars/${id}/analytics`),
+  },
+
+  // Branding & Settings
+  branding: {
+    get: () => _fetch<BrandingData>('/admin/branding'),
+    update: (data: Partial<BrandingData>) => _fetch<{ branding: BrandingData }>('/admin/branding', { method: 'PUT', body: data }),
+  },
+  settings: {
+    get: () => _fetch<SettingsData>('/admin/settings'),
+    update: (data: Partial<SettingsData>) => _fetch<{ settings: SettingsData }>('/admin/settings', { method: 'PUT', body: data }),
+  },
+
+  // Custom Domains
+  domains: {
+    list: () => _fetch<{ domains: TenantDomain[]; instructions: DomainInstructions }>('/admin/domains'),
+    add: (domain: string) => _fetch<{ domain: TenantDomain }>('/admin/domains', { method: 'POST', body: { domain } }),
+    verify: (id: string) => _fetch<{ domain: TenantDomain; verified: boolean; message: string }>(`/admin/domains/${id}/verify`, { method: 'POST' }),
+    delete: (id: string) => _fetch<{ message: string }>(`/admin/domains/${id}`, { method: 'DELETE' }),
+  },
+
+  // Leads
+  leads: {
+    webinar: (webinarId: string) => _fetch<{ leads: Lead[]; total: number; summary: LeadsSummary }>(`/admin/webinars/${webinarId}/leads`),
+  },
 }
 
 // ── Domain types for the client ────────────────────────────────────
@@ -195,8 +226,98 @@ export interface CreateWebinarInput {
   startDate: string
   startTime: string
   endTime: string
-  timezone?: string
-  youtubeVideoId?: string
+  timezone: string
   maxParticipants?: number
-  registrationOpen?: boolean
+  youtubeVideoId?: string
+}
+
+export interface PlatformAnalytics {
+  totalWebinars: number
+  publishedWebinars: number
+  liveWebinars: number
+  totalRegistrations: number
+  totalAttended: number
+  overallAttendanceRate: number
+  thisMonthRegistrations: number
+  topWebinars: {
+    id: string
+    title: string
+    registrations: number
+    attended: number
+    attendanceRate: number
+  }[]
+}
+
+export interface WebinarAnalytics {
+  webinarId: string
+  title: string
+  status: string
+  totalRegistrations: number
+  attendedCount: number
+  attendanceRate: number
+  registrationsByDay: { date: string; count: number }[]
+  countryCounts: { country: string; count: number }[]
+}
+
+export interface BrandingData {
+  primary_color: string
+  secondary_color: string
+  accent_color: string
+  background_color: string
+  surface_color: string
+  text_color: string
+  muted_color: string
+  border_color: string
+  success_color: string
+  warning_color: string
+  error_color: string
+  font_heading: string
+  font_body: string
+  logo_url: string | null
+  favicon_url: string | null
+}
+
+export interface SettingsData {
+  max_webinars: number
+  max_participants: number
+  chat_rate_limit_messages: number
+  chat_rate_limit_window_seconds: number
+}
+
+export interface TenantDomain {
+  id: string
+  tenant_id: string
+  domain: string
+  status: 'pending' | 'active' | 'failed' | 'deactivated'
+  ssl_status: 'pending' | 'active' | 'failed' | 'issuing'
+  verification_token: string
+  cname_target: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DomainInstructions {
+  cnameTarget: string
+  txtPrefix: string
+}
+
+export interface Lead {
+  id: string
+  name: string
+  email: string
+  phone_e164: string | null
+  country_code: string | null
+  interests: string[]
+  rating: number | null
+  suggestion: string | null
+  contact_requested: number
+  preferred_contact: string | null
+  created_at: string
+}
+
+export interface LeadsSummary {
+  totalLeads: number
+  avgRating: number | null
+  contactRequested: number
+  ratingCounts: { rating: number; count: number }[]
 }
