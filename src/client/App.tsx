@@ -22,6 +22,7 @@ const AdminLoginPage             = lazy(() => import('./pages/admin/AdminLoginPa
 const AdminWebinarListPage       = lazy(() => import('./pages/admin/AdminWebinarListPage'))
 const AdminWebinarFormPage       = lazy(() => import('./pages/admin/AdminWebinarFormPage'))
 const AdminWebinarDetailPage     = lazy(() => import('./pages/admin/AdminWebinarDetailPage'))
+const AdminWebinarStudioPage     = lazy(() => import('./pages/admin/AdminWebinarStudioPage'))
 const AdminRegistrationsPage     = lazy(() => import('./pages/admin/AdminRegistrationsPage'))
 const AdminLeadsPage             = lazy(() => import('./pages/admin/AdminLeadsPage'))
 // Phase 9: Analytics pages (lazy-loaded)
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="webinars" element={<AdminWebinarListPage />} />
             <Route path="webinars/new" element={<AdminWebinarFormPage />} />
             <Route path="webinars/:id" element={<AdminWebinarDetailPage />} />
+            <Route path="webinars/:id/studio" element={<AdminWebinarStudioPage />} />
             <Route path="webinars/:id/edit" element={<AdminWebinarFormPage />} />
             <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
             <Route path="registrations" element={<AdminRegistrationsPage />} />

@@ -41,6 +41,15 @@ function WebinarRowActions({ webinar }: { webinar: WebinarSummary }) {
 
   return (
     <div className="admin-table-actions">
+      <button
+        type="button"
+        className="admin-table-action-btn"
+        onClick={(e) => { e.stopPropagation(); navigate(`/admin/webinars/${webinar.id}/studio`) }}
+        title="Open Live Host Studio"
+        style={{ fontWeight: 600, color: webinar.status === 'LIVE' ? '#dc2626' : undefined }}
+      >
+        🎙️ Studio
+      </button>
       {webinar.status === 'DRAFT' && (
         <button
           type="button"

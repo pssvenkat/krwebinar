@@ -61,12 +61,21 @@ function StatusControls({ id, status }: { id: string; status: string }) {
         {status}
       </Badge>
       <div className="admin-status-actions">
+        <Button
+          id="ctrl-studio"
+          variant="primary"
+          size="sm"
+          onClick={() => navigate(`/admin/webinars/${id}/studio`)}
+          style={{ background: status === 'LIVE' ? '#dc2626' : undefined, borderColor: status === 'LIVE' ? '#dc2626' : undefined }}
+        >
+          🎙️ {status === 'LIVE' ? 'Enter Live Studio (ON AIR)' : 'Enter Host Studio'}
+        </Button>
         {status === 'DRAFT' && (
           <>
             <Button id="ctrl-edit" variant="secondary" size="sm" onClick={() => navigate(`/admin/webinars/${id}/edit`)}>
               Edit
             </Button>
-            <Button id="ctrl-publish" variant="primary" size="sm" loading={isPending}
+            <Button id="ctrl-publish" variant="outline" size="sm" loading={isPending}
               onClick={() => publish.mutate(id)}>
               Publish
             </Button>
@@ -77,7 +86,7 @@ function StatusControls({ id, status }: { id: string; status: string }) {
             <Button id="ctrl-edit" variant="secondary" size="sm" onClick={() => navigate(`/admin/webinars/${id}/edit`)}>
               Edit
             </Button>
-            <Button id="ctrl-golive" variant="primary" size="sm" loading={isPending}
+            <Button id="ctrl-golive" variant="outline" size="sm" loading={isPending}
               onClick={() => goLive.mutate(id)}>
               Go Live
             </Button>
