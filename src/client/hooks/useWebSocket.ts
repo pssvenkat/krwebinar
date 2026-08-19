@@ -45,6 +45,11 @@ export function useWebSocket<T = unknown>(url: string | null): WebSocketHook<T> 
       if (unmountedRef.current) { ws.close(); return }
       setReadyState('OPEN')
       reconnectDelayRef.current = 1000  // reset backoff on success
+      try {
+        ws.send(JSON.stringify({ type: 'JOIN' }))
+      } catch {
+        // ignore
+      }
     }
 
     ws.onmessage = (evt) => {

@@ -86,10 +86,7 @@ app.get('/:id/ws', async (c) => {
   })
 
   const doUrl = `https://do/ws?${params.toString()}`
-  const doReq = new Request(doUrl, {
-    headers: c.req.raw.headers,
-    method: 'GET',
-  })
+  const doReq = new Request(doUrl, c.req.raw)
 
   return stub.fetch(doReq)
 })
@@ -137,10 +134,7 @@ app.get('/:id/ws/host', async (c) => {
   })
 
   const doUrl = `https://do/ws?${params.toString()}`
-  const doReq = new Request(doUrl, {
-    headers: c.req.raw.headers,
-    method: 'GET',
-  })
+  const doReq = new Request(doUrl, c.req.raw)
 
   return stub.fetch(doReq)
 })

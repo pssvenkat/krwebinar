@@ -84,7 +84,7 @@ export class WebinarRoom implements DurableObject {
     const url = new URL(request.url)
     const upgradeHeader = request.headers.get('Upgrade')
 
-    if (upgradeHeader?.toLowerCase() === 'websocket') {
+    if (upgradeHeader?.toLowerCase() === 'websocket' || url.pathname.includes('/ws')) {
       return this.handleWebSocketUpgrade(request, url)
     }
 
@@ -147,9 +147,15 @@ export class WebinarRoom implements DurableObject {
 
     this.connections.set(sessionId, connection)
 
-    // Send complete current room snapshot to the connecting client
-    this.sendTo(server, this.buildRoomState())
-    this.broadcastParticipantCount()
+    // Send complete current room snapshot to the connecting client asynchronously after 101 response
+    setTimeout(() => {
+      try {
+        this.sendTo(server, this.buildRoomState())
+        this.broadcastParticipantCount()
+      } catch {
+        // ignore
+      }
+    }, 10)
 
     return new Response(null, { status: 101, webSocket: client })
   }
@@ -202,6 +208,12 @@ export class WebinarRoom implements DurableObject {
     }
 
     switch (data.type) {
+      case 'JOIN':
+      case 'GET_STATE':
+        this.sendTo(ws, this.buildRoomState())
+        this.broadcastParticipantCount()
+        break
+
       case 'HEARTBEAT':
         this.sendTo(ws, { type: 'HEARTBEAT_ACK', timestamp: new Date().toISOString() })
         break

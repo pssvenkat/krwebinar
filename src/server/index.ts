@@ -28,10 +28,20 @@ const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 // ─────────────────────────────────────────────────────────────────
 
 app.use('*', logger())
-app.use('/api/*', secureHeaders())
+
+// Secure headers (skip on WebSocket upgrades so 101 Switching Protocols is not modified)
+app.use('/api/*', async (c, next) => {
+  if (c.req.header('upgrade')?.toLowerCase() === 'websocket' || c.req.path.startsWith('/api/v1/ws')) {
+    return next()
+  }
+  return secureHeaders()(c, next)
+})
 
 // CORS
 app.use('/api/*', async (c, next) => {
+  if (c.req.header('upgrade')?.toLowerCase() === 'websocket') {
+    return next()
+  }
   const origin = c.req.header('origin') ?? ''
   const env = c.env.ENVIRONMENT ?? 'development'
   const isAllowed =
