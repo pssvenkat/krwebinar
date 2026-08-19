@@ -1,19 +1,11 @@
 -- ─────────────────────────────────────────────────────────────────
--- Phase 7 Seed: Initial Tenant + Admin User
--- ─────────────────────────────────────────────────────────────────
--- Run AFTER all migrations:
---   wrangler d1 execute krwebinar-db --file=db/seeds/001_initial_tenant.sql
---
--- IMPORTANT: Replace the password_hash value with output from:
---   npx tsx scripts/hash-password.ts "YourSecurePassword"
---
--- IDs use a fixed ULID format for idempotent re-seeding.
+-- Phase 7 Seed: Initial Tenant + Admin Users + Sample Webinar
 -- ─────────────────────────────────────────────────────────────────
 
 -- Tenant
-INSERT OR IGNORE INTO tenants (id, slug, name, plan_tier, status, created_at, updated_at)
+INSERT OR IGNORE INTO tenants (id, slug, name, plan, status, created_at, updated_at)
 VALUES (
-  '01HZ0000000000000000000001',
+  '01JCRM0000000000000KRAVETEN',
   'krave',
   'Krave Microgreens',
   'starter',
@@ -22,66 +14,13 @@ VALUES (
   datetime('now')
 );
 
--- Tenant Branding (green-forward palette)
-INSERT OR IGNORE INTO tenant_branding (
-  id, tenant_id,
-  primary_color, secondary_color, accent_color,
-  background_color, surface_color,
-  text_color, muted_color, border_color,
-  font_heading, font_body,
-  border_radius_base,
-  created_at, updated_at
-) VALUES (
-  '01HZ0000000000000000000002',
-  '01HZ0000000000000000000001',
-  '#16a34a',   -- green-600
-  '#15803d',   -- green-700
-  '#4ade80',   -- green-400
-  '#f9fafb',   -- gray-50
-  '#ffffff',   -- white
-  '#111827',   -- gray-900
-  '#6b7280',   -- gray-500
-  '#e5e7eb',   -- gray-200
-  'Inter, sans-serif',
-  'Inter, sans-serif',
-  '0.5rem',
-  datetime('now'),
-  datetime('now')
-);
-
--- Tenant Settings
-INSERT OR IGNORE INTO tenant_settings (
-  id, tenant_id,
-  max_webinars_per_month,
-  max_participants_per_webinar,
-  registration_fields,
-  consent_purposes,
-  support_email,
-  timezone,
-  locale,
-  created_at, updated_at
-) VALUES (
-  '01HZ0000000000000000000003',
-  '01HZ0000000000000000000001',
-  10,
-  500,
-  '["name","email","phone","country"]',
-  '["data_processing","marketing"]',
-  'hello@kravemicrogreens.in',
-  'Asia/Kolkata',
-  'en-IN',
-  datetime('now'),
-  datetime('now')
-);
-
--- Admin User
--- Default password: ChangeMe123!  ← CHANGE THIS BEFORE GOING LIVE
--- To regenerate: npx tsx scripts/hash-password.ts "YourSecurePassword"
+-- Vendor Admin User (Krave Microgreens)
+-- Email: admin@kravemicrogreens.in | Password: ChangeMe123!
 INSERT OR IGNORE INTO users (
   id, tenant_id, email, name, password_hash, role, is_active, created_at, updated_at
 ) VALUES (
   '01HZ0000000000000000000004',
-  '01HZ0000000000000000000001',
+  '01JCRM0000000000000KRAVETEN',
   'admin@kravemicrogreens.in',
   'Krave Admin',
   'pbkdf2:sha256:310000:59bf6b737685e7c2ec8942af6a46ad8a:efac9e15abc14184059052ef4aadccae31da20c8ea15b5cd35427803a48ce03e',
@@ -91,25 +30,60 @@ INSERT OR IGNORE INTO users (
   datetime('now')
 );
 
--- Sample published webinar (optional — remove for production)
+-- Platform Owner User
+-- Email: owner@krwebinar.com | Password: ChangeMe123!
+INSERT OR IGNORE INTO users (
+  id, tenant_id, email, name, password_hash, role, is_active, created_at, updated_at
+) VALUES (
+  '01HZ0000000000000000000009',
+  NULL,
+  'owner@krwebinar.com',
+  'Platform Owner',
+  'pbkdf2:sha256:310000:59bf6b737685e7c2ec8942af6a46ad8a:efac9e15abc14184059052ef4aadccae31da20c8ea15b5cd35427803a48ce03e',
+  'PLATFORM_OWNER',
+  1,
+  datetime('now'),
+  datetime('now')
+);
+
+-- Sample published webinar
 INSERT OR IGNORE INTO webinars (
   id, tenant_id, title, description, host_name,
   start_date, start_time, end_time, timezone,
   status, max_participants, registration_open,
+  youtube_video_id,
   created_at, updated_at
 ) VALUES (
   '01HZ0000000000000000000005',
-  '01HZ0000000000000000000001',
-  'Introduction to Microgreens',
-  'Learn how to grow microgreens at home with minimal setup. Perfect for beginners!',
+  '01JCRM0000000000000KRAVETEN',
+  'Introduction to Urban Microgreens',
+  'Learn how to grow nutrient-dense microgreens at home with minimal setup. Perfect for beginners and enthusiasts!',
   'Priya Sharma',
-  date('now', '+7 days'),
+  date('now', '+3 days'),
   '10:00',
   '11:30',
   'Asia/Kolkata',
-  'DRAFT',
+  'PUBLISHED',
   100,
   1,
+  'dQw4w9WgXcQ',
   datetime('now'),
+  datetime('now')
+);
+
+-- Sample registration & token for attendee live room testing
+INSERT OR IGNORE INTO webinar_registrations (
+  id, tenant_id, webinar_id, email, name, phone_e164, country_code,
+  access_token, attended, registered_at
+) VALUES (
+  '01HZ0000000000000000000010',
+  '01JCRM0000000000000KRAVETEN',
+  '01HZ0000000000000000000005',
+  'attendee@example.com',
+  'Demo Attendee',
+  '+919876543210',
+  'IN',
+  'demo-token',
+  0,
   datetime('now')
 );

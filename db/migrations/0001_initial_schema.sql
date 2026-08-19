@@ -2,9 +2,6 @@
 -- Phase 1: Bootstrap tables
 -- Creates the core tenant and health tables needed for the platform to boot.
 
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
 -- ─────────────────────────────────────────────────────────────────
 -- TENANTS (VENDORS)
 -- The root entity. Every other table references this.

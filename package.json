@@ -22,6 +22,7 @@
     "db:migrate:remote": "wrangler d1 execute krwebinar-db --file="
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.9.0",
     "@tanstack/react-query": "^5.56.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

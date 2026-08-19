@@ -1,8 +1,6 @@
 -- Migration: 0002_webinars.sql
 -- Phase 3: Webinar, registration, lead, and consent tables
 
-PRAGMA foreign_keys = ON;
-
 -- ─────────────────────────────────────────────────────────────────
 -- WEBINARS
 -- One row per scheduled webinar session. Always scoped to a tenant.
