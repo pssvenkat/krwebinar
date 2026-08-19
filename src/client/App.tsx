@@ -68,6 +68,8 @@ export default function App() {
           {/* ── Phase 4: Registration flow ── */}
           <Route path="/register/:webinarId" element={<RegisterPage />} />
           <Route path="/w/:token" element={<AttendPage />} />
+          <Route path="/attend/:token" element={<AttendPage />} />
+          <Route path="/live/:token" element={<AttendPage />} />
           <Route path="/w/:token/feedback" element={<FeedbackPage />} />
 
           {/* ── Admin login (unguarded) ── */}

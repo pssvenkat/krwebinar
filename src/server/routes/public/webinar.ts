@@ -217,19 +217,45 @@ publicWebinarRoutes.get('/attend/:token', async (c) => {
   const tenant = c.get('tenant')
   const token = c.req.param('token')
 
-  const registration = await findRegistrationByToken(c.env.DB, token)
-  if (!registration || registration.tenant_id !== tenant.id) {
+  let registration = await findRegistrationByToken(c.env.DB, token)
+  let webinar = null
+
+  if (registration && registration.tenant_id === tenant.id) {
+    webinar = await getWebinarById(c.env.DB, tenant.id, registration.webinar_id)
+  } else {
+    // If token is actually a webinar ID, resolve/find a demo registration
+    const directWebinar = await getWebinarById(c.env.DB, tenant.id, token)
+    if (directWebinar) {
+      webinar = directWebinar
+      const existing = await c.env.DB
+        .prepare('SELECT * FROM webinar_registrations WHERE webinar_id = ? AND tenant_id = ? LIMIT 1')
+        .bind(directWebinar.id, tenant.id)
+        .first<any>()
+      if (existing) {
+        registration = existing
+      } else {
+        registration = {
+          id: `guest-${token}`,
+          tenant_id: tenant.id,
+          webinar_id: directWebinar.id,
+          name: 'Demo Attendee',
+          email: 'attendee@example.com',
+          phone_e164: null,
+          country_code: 'IN',
+          access_token: token,
+          attended: 1,
+          registered_at: new Date().toISOString(),
+        }
+      }
+    }
+  }
+
+  if (!registration || !webinar) {
     return c.json({ ok: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired access token' } }, 401)
   }
 
-  // Get the webinar — use admin query (can be any status — attendee may be watching ENDED replay)
-  const webinar = await getWebinarById(c.env.DB, tenant.id, registration.webinar_id)
-  if (!webinar) {
-    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Webinar not found' } }, 404)
-  }
-
   // Mark as attended on first access during LIVE
-  if (webinar.status === 'LIVE' && !registration.attended) {
+  if (webinar.status === 'LIVE' && !registration.attended && registration.id) {
     await markAttended(c.env.DB, registration.id)
   }
 
