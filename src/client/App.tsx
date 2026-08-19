@@ -27,6 +27,11 @@ const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyti
 const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
 // Phase 10: Branding page (lazy-loaded)
 const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
+// Phase 12: Platform admin pages (lazy-loaded)
+const PlatformLayout             = lazy(() => import('./pages/platform/PlatformLayout'))
+const PlatformTenantsPage        = lazy(() => import('./pages/platform/PlatformTenantsPage'))
+const PlatformTenantFormPage     = lazy(() => import('./pages/platform/PlatformTenantFormPage'))
+const PlatformTenantDetailPage   = lazy(() => import('./pages/platform/PlatformTenantDetailPage'))
 
 // Dev pages
 import DesignSystemPage from './pages/dev/DesignSystemPage'
@@ -78,6 +83,21 @@ export default function App() {
             <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
+          </Route>
+
+          {/* ── Phase 12: Platform admin routes (PLATFORM_OWNER) ── */}
+          <Route
+            path="/platform"
+            element={
+              <RequireAuth>
+                <PlatformLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<PlatformTenantsPage />} />
+            <Route path="tenants" element={<PlatformTenantsPage />} />
+            <Route path="tenants/new" element={<PlatformTenantFormPage />} />
+            <Route path="tenants/:id" element={<PlatformTenantDetailPage />} />
           </Route>
 
           {/* ── Dev routes ── */}

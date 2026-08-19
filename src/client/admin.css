@@ -910,3 +910,233 @@ select.input-field:focus {
     overflow-x: auto;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 12 — PLATFORM ADMIN STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+.platform-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-background);
+}
+
+.platform-sidebar {
+  width: 260px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  flex-shrink: 0;
+}
+
+.platform-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1.5rem;
+}
+
+.platform-sidebar-logo {
+  font-size: 1.5rem;
+}
+
+.platform-sidebar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.platform-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1;
+}
+
+.platform-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.5rem;
+  color: var(--color-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.platform-nav-link:hover {
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.platform-nav-link--active {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.platform-sidebar-footer {
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.platform-sidebar-role {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  display: inline-block;
+}
+
+.platform-main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  overflow-y: auto;
+}
+
+.platform-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.platform-tenant-name {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.platform-tenant-name:hover {
+  text-decoration: underline;
+}
+
+.platform-tenant-slug {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  font-family: 'Roboto Mono', monospace;
+}
+
+/* ── Platform Form ────────────────────────────────────────────── */
+
+.platform-form {
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.platform-form-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.platform-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.platform-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.platform-label-hint {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.platform-input {
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  transition: border-color 0.15s;
+}
+
+.platform-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.platform-input--error {
+  border-color: var(--color-error, #ef4444);
+}
+
+.platform-slug-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  overflow: hidden;
+}
+
+.platform-slug-prefix {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  font-family: 'Roboto Mono', monospace;
+  white-space: nowrap;
+}
+
+.platform-slug-input {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+}
+
+.platform-field-error {
+  font-size: 0.75rem;
+  color: var(--color-error, #ef4444);
+  margin: 0.25rem 0 0;
+}
+
+.platform-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .platform-shell {
+    flex-direction: column;
+  }
+
+  .platform-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .platform-main {
+    padding: 1.25rem;
+  }
+}

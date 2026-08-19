@@ -1050,3 +1050,129 @@ export async function getLeadsCsvRows(
     created_at: r.created_at,
   }))
 }
+
+// ── Phase 12: Platform admin helpers ─────────────────────────────
+
+export interface PlatformTenant {
+  id: string
+  slug: string
+  name: string
+  status: string
+  plan: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PlatformTenantStats {
+  webinarCount: number
+  registrationCount: number
+  leadCount: number
+}
+
+/** List all tenants (platform owner use only) */
+export async function listPlatformTenants(db: D1Database): Promise<PlatformTenant[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, slug, name, status, plan, created_at, updated_at
+       FROM tenants
+       ORDER BY created_at DESC`,
+    )
+    .all<PlatformTenant>()
+  return result.results
+}
+
+/** Create a new tenant and seed branding + settings rows */
+export async function createPlatformTenant(
+  db: D1Database,
+  data: { name: string; slug: string; plan: string },
+): Promise<PlatformTenant> {
+  const id = generateULID()
+  const now = new Date().toISOString()
+
+  // Insert tenant
+  await db
+    .prepare(
+      `INSERT INTO tenants (id, slug, name, status, plan, created_at, updated_at)
+       VALUES (?, ?, ?, 'trial', ?, ?, ?)`,
+    )
+    .bind(id, data.slug, data.name, data.plan, now, now)
+    .run()
+
+  // Seed branding row (uses all defaults)
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO tenant_branding (tenant_id, updated_at) VALUES (?, ?)`,
+    )
+    .bind(id, now)
+    .run()
+
+  // Seed settings row (uses all defaults)
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO tenant_settings (tenant_id, updated_at) VALUES (?, ?)`,
+    )
+    .bind(id, now)
+    .run()
+
+  const tenant = await db
+    .prepare('SELECT id, slug, name, status, plan, created_at, updated_at FROM tenants WHERE id = ? LIMIT 1')
+    .bind(id)
+    .first<PlatformTenant>()
+  return tenant!
+}
+
+/** Get single tenant by ID */
+export async function getPlatformTenantById(
+  db: D1Database,
+  id: string,
+): Promise<PlatformTenant | null> {
+  const result = await db
+    .prepare(
+      'SELECT id, slug, name, status, plan, created_at, updated_at FROM tenants WHERE id = ? LIMIT 1',
+    )
+    .bind(id)
+    .first<PlatformTenant>()
+  return result ?? null
+}
+
+/** Update tenant status (trial | active | suspended) */
+export async function updatePlatformTenantStatus(
+  db: D1Database,
+  id: string,
+  status: string,
+): Promise<PlatformTenant> {
+  const now = new Date().toISOString()
+  await db
+    .prepare('UPDATE tenants SET status = ?, updated_at = ? WHERE id = ?')
+    .bind(status, now, id)
+    .run()
+  const tenant = await getPlatformTenantById(db, id)
+  return tenant!
+}
+
+/** Aggregate counts for a tenant */
+export async function getPlatformTenantStats(
+  db: D1Database,
+  tenantId: string,
+): Promise<PlatformTenantStats> {
+  const [webinars, registrations, leads] = await Promise.all([
+    db
+      .prepare('SELECT COUNT(*) as count FROM webinars WHERE tenant_id = ?')
+      .bind(tenantId)
+      .first<{ count: number }>(),
+    db
+      .prepare('SELECT COUNT(*) as count FROM webinar_registrations WHERE tenant_id = ?')
+      .bind(tenantId)
+      .first<{ count: number }>(),
+    db
+      .prepare('SELECT COUNT(*) as count FROM lead_captures WHERE tenant_id = ?')
+      .bind(tenantId)
+      .first<{ count: number }>(),
+  ])
+
+  return {
+    webinarCount: webinars?.count ?? 0,
+    registrationCount: registrations?.count ?? 0,
+    leadCount: leads?.count ?? 0,
+  }
+}
