@@ -251,7 +251,27 @@ export class WebinarRoom implements DurableObject {
     }
   }
 
-  private broadcastParticipantCount(): void {
+  private countBroadcastTimeout: ReturnType<typeof setTimeout> | null = null
+
+  private broadcastParticipantCount(immediate = false): void {
+    if (immediate) {
+      if (this.countBroadcastTimeout) {
+        clearTimeout(this.countBroadcastTimeout)
+        this.countBroadcastTimeout = null
+      }
+      this.sendParticipantCount()
+      return
+    }
+
+    if (!this.countBroadcastTimeout) {
+      this.countBroadcastTimeout = setTimeout(() => {
+        this.countBroadcastTimeout = null
+        this.sendParticipantCount()
+      }, 300)
+    }
+  }
+
+  private sendParticipantCount(): void {
     const msg: ParticipantCountMessage = {
       type: 'PARTICIPANT_COUNT',
       count: this.connections.size,

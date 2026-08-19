@@ -28,6 +28,12 @@ const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 app.use('*', logger())
 app.use('*', secureHeaders())
 
+// Static asset caching for CDN / browser performance (immutable hashed assets)
+app.use('/assets/*', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'public, max-age=31536000, immutable')
+})
+
 // CORS
 app.use('/api/*', async (c, next) => {
   const origin = c.req.header('origin') ?? ''
