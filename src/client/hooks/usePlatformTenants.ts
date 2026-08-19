@@ -33,13 +33,14 @@ async function platformFetch<T>(
   const token = getAccessToken()
   const res = await fetch(path, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options?.headers as Record<string, string> ?? {}),
+      ...((options?.headers as Record<string, string>) ?? {}),
     },
   })
-  const json = await res.json() as { ok: boolean; data?: T; error?: { message: string } }
+  const json = (await res.json()) as { ok: boolean; data?: T; error?: { message: string } }
   if (!json.ok) throw new Error(json.error?.message ?? 'Request failed')
   return json.data!
 }

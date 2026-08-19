@@ -32,7 +32,7 @@ new_sqlite_classes = ["WebinarRoom"]
 
 # Environment variables (non-secret)
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
 PLATFORM_NAME = "WebinarPlatform"
 
 # Development environment overrides

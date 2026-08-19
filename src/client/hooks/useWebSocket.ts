@@ -35,7 +35,10 @@ export function useWebSocket<T = unknown>(url: string | null): WebSocketHook<T> 
   const unmountedRef = useRef(false)
 
   const connect = useCallback(() => {
-    if (!url || unmountedRef.current) return
+    if (!url || unmountedRef.current) {
+      setReadyState('CLOSED')
+      return
+    }
 
     const ws = new WebSocket(url)
     wsRef.current = ws

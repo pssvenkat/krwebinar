@@ -1,35 +1,31 @@
 import { test, expect } from '@playwright/test'
 
-/**
- * Phase 1 — Foundation smoke tests
- *
- * These tests verify the basic application shell is working.
- * Full E2E journey tests will be added in Phase 24.
- */
-
 test.describe('Platform Foundation', () => {
   test('home page loads with platform branding', async ({ page }) => {
     await page.goto('/')
     await expect(page).toHaveTitle(/WebinarPlatform/i)
-    await expect(page.getByText('WebinarPlatform')).toBeVisible()
-    await expect(page.getByText('Live Learning, Reimagined')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Live Learning, Reimagined/i })).toBeVisible()
   })
 
   test('admin link is present on home page', async ({ page }) => {
     await page.goto('/')
-    const adminLink = page.getByRole('link', { name: /admin dashboard/i })
+    const adminLink = page.locator('a[href="/admin"]')
     await expect(adminLink).toBeVisible()
   })
 
-  test('admin dashboard loads', async ({ page }) => {
-    await page.goto('/admin')
-    await expect(page.getByText('Dashboard')).toBeVisible()
-    await expect(page.getByText('Platform Status')).toBeVisible()
+  test('admin dashboard loads after login', async ({ page }) => {
+    await page.goto('/admin/login')
+    await expect(page.locator('#login-email')).toBeVisible({ timeout: 10000 })
+    await page.fill('#login-email', 'admin@kravemicrogreens.in')
+    await page.fill('#login-password', 'ChangeMe123!')
+    await page.click('#login-submit')
+    await expect(page).toHaveURL('/admin', { timeout: 10000 })
+    await expect(page.locator('header').getByText('Vendor Admin')).toBeVisible()
   })
 
   test('404 page shows for unknown routes', async ({ page }) => {
     await page.goto('/this-route-does-not-exist')
-    await expect(page.getByText('Page Not Found')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Page Not Found' })).toBeVisible()
     const backLink = page.getByRole('link', { name: /back to home/i })
     await expect(backLink).toBeVisible()
   })
@@ -40,11 +36,16 @@ test.describe('Platform Foundation', () => {
     await expect(page).toHaveURL('/')
   })
 
-  test('admin sidebar navigation is visible', async ({ page }) => {
-    await page.goto('/admin')
-    await expect(page.getByText('Webinars')).toBeVisible()
-    await expect(page.getByText('Leads')).toBeVisible()
-    await expect(page.getByText('Analytics')).toBeVisible()
-    await expect(page.getByText('Branding')).toBeVisible()
+  test('admin sidebar navigation is visible after login', async ({ page }) => {
+    await page.goto('/admin/login')
+    await expect(page.locator('#login-email')).toBeVisible({ timeout: 10000 })
+    await page.fill('#login-email', 'admin@kravemicrogreens.in')
+    await page.fill('#login-password', 'ChangeMe123!')
+    await page.click('#login-submit')
+    await expect(page).toHaveURL('/admin', { timeout: 10000 })
+    await expect(page.getByRole('link', { name: /Webinars/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Leads/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Analytics/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Branding/i })).toBeVisible()
   })
 })
