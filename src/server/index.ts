@@ -28,13 +28,7 @@ const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 // ─────────────────────────────────────────────────────────────────
 
 app.use('*', logger())
-app.use('*', secureHeaders())
-
-// Static asset caching for CDN / browser performance (immutable hashed assets)
-app.use('/assets/*', async (c, next) => {
-  await next()
-  c.header('Cache-Control', 'public, max-age=31536000, immutable')
-})
+app.use('/api/*', secureHeaders())
 
 // CORS
 app.use('/api/*', async (c, next) => {
@@ -99,12 +93,25 @@ app.route('/api/v1/ws/webinar', wsRoutes)
 // Unsubscribe (no auth, no tenant — keyed by access_token)
 app.route('/api/v1/unsubscribe', unsubscribeRoutes)
 
+// SPA Static Assets & Index Fallback (Runs for all non-API GET requests)
+app.get('*', async (c, next) => {
+  if (c.req.path.startsWith('/api/')) {
+    return next()
+  }
+  if (c.env.ASSETS) {
+    let res = await c.env.ASSETS.fetch(c.req.raw)
+    if (res.status === 404) {
+      const indexUrl = new URL('/index.html', c.req.url)
+      res = await c.env.ASSETS.fetch(new Request(indexUrl.toString(), { headers: c.req.raw.headers }))
+    }
+    return new Response(res.body, res)
+  }
+  return next()
+})
+
 // 404 handler for unmatched API routes
 app.notFound((c) => {
-  if (c.req.path.startsWith('/api/')) {
-    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404)
-  }
-  return c.notFound()
+  return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404)
 })
 
 // Global error handler

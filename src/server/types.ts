@@ -21,6 +21,9 @@ export interface Env {
   JWT_SECRET: string
   REFRESH_TOKEN_SECRET: string
   TURNSTILE_SECRET_KEY: string
+
+  // Cloudflare Assets binding
+  ASSETS?: Fetcher
 }
 
 /**
