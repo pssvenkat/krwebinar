@@ -18,10 +18,13 @@ const AttendPage     = lazy(() => import('./pages/attend/AttendPage'))
 const FeedbackPage   = lazy(() => import('./pages/public/FeedbackPage'))
 
 // Phase 5: Admin pages (lazy-loaded)
-const AdminLoginPage        = lazy(() => import('./pages/admin/AdminLoginPage'))
-const AdminWebinarListPage  = lazy(() => import('./pages/admin/AdminWebinarListPage'))
-const AdminWebinarFormPage  = lazy(() => import('./pages/admin/AdminWebinarFormPage'))
-const AdminWebinarDetailPage = lazy(() => import('./pages/admin/AdminWebinarDetailPage'))
+const AdminLoginPage             = lazy(() => import('./pages/admin/AdminLoginPage'))
+const AdminWebinarListPage       = lazy(() => import('./pages/admin/AdminWebinarListPage'))
+const AdminWebinarFormPage       = lazy(() => import('./pages/admin/AdminWebinarFormPage'))
+const AdminWebinarDetailPage     = lazy(() => import('./pages/admin/AdminWebinarDetailPage'))
+// Phase 9: Analytics pages (lazy-loaded)
+const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyticsPage'))
+const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
 
 // Dev pages
 import DesignSystemPage from './pages/dev/DesignSystemPage'
@@ -66,6 +69,8 @@ export default function App() {
             <Route path="webinars/new" element={<AdminWebinarFormPage />} />
             <Route path="webinars/:id" element={<AdminWebinarDetailPage />} />
             <Route path="webinars/:id/edit" element={<AdminWebinarFormPage />} />
+            <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
 
           {/* ── Dev routes ── */}

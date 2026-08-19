@@ -182,3 +182,337 @@ select.input-field:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-focus-ring, rgba(79, 70, 229, 0.15));
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 9 — ANALYTICS
+   ═══════════════════════════════════════════════════════════════ */
+
+.admin-analytics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ── KPI grid ─────────────────────────────────────────────────── */
+
+.analytics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.analytics-kpi-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.analytics-kpi-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.analytics-kpi-card--highlight {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.analytics-kpi-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.analytics-kpi-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+
+.analytics-kpi-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+/* ── Section ──────────────────────────────────────────────────── */
+
+.analytics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.analytics-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* ── Inline progress bar (top webinars table) ─────────────────── */
+
+.analytics-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.analytics-inline-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.analytics-inline-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.analytics-bar-pct {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* ── Table ────────────────────────────────────────────────────── */
+
+.analytics-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+}
+
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.analytics-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.analytics-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.analytics-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.analytics-table tbody tr:hover td {
+  background: var(--color-background);
+}
+
+.analytics-table--compact th,
+.analytics-table--compact td {
+  padding: 0.625rem 0.875rem;
+}
+
+.analytics-table-num {
+  text-align: right;
+}
+
+.analytics-table-bar {
+  min-width: 160px;
+}
+
+.analytics-table-title {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.analytics-table-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.analytics-table-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Day-by-day bar chart ─────────────────────────────────────── */
+
+.analytics-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 140px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-surface);
+  padding: 1rem 1rem 0.5rem;
+  overflow-x: auto;
+}
+
+.analytics-bar-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 28px;
+  max-width: 60px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.analytics-bar-chart-bar {
+  width: 100%;
+  background: var(--color-primary);
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s ease;
+  min-height: 4px;
+}
+
+.analytics-bar-chart-label {
+  font-size: 0.625rem;
+  color: var(--color-muted);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  max-height: 3rem;
+  overflow: hidden;
+}
+
+.analytics-chart-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  padding: 2rem;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+}
+
+/* ── Attendance funnel ────────────────────────────────────────── */
+
+.analytics-funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.analytics-funnel-step {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.analytics-funnel-bar {
+  display: flex;
+  align-items: center;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  min-height: 40px;
+  box-sizing: border-box;
+  transition: width 0.4s ease;
+}
+
+.analytics-funnel-bar--registered {
+  background: var(--color-primary);
+}
+
+.analytics-funnel-bar--attended {
+  background: #16a34a;
+}
+
+.analytics-funnel-missed {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.analytics-funnel-rate {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+/* ── Breadcrumb ───────────────────────────────────────────────── */
+
+.analytics-breadcrumb {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  margin-bottom: 0.25rem;
+}
+
+.analytics-breadcrumb-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.analytics-breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+
+.analytics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 4rem 2rem;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 0.75rem;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .analytics-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-kpi-value {
+    font-size: 1.5rem;
+  }
+
+  .analytics-table-bar {
+    display: none;
+  }
+}
