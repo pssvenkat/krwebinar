@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+/// <reference types="vite/client" />
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { z } from 'zod'
@@ -11,6 +12,56 @@ import { CountrySelect } from '../../components/ui/CountrySelect'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
 import { LoadingState, ErrorState } from '../../components/ui/States'
+
+// Turnstile site key — override via VITE_TURNSTILE_SITE_KEY env var
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+
+// ── Turnstile hook ────────────────────────────────────────────────
+
+function useTurnstile(containerId: string) {
+  const [token, setToken] = useState<string | null>(null)
+  const widgetIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return   // dev: skip, server also skips
+
+    function render() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ts = (window as any).turnstile
+      if (!ts || !document.getElementById(containerId)) return
+
+      widgetIdRef.current = ts.render(`#${containerId}`, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (t: string) => setToken(t),
+        'expired-callback': () => setToken(null),
+        'error-callback': () => setToken(null),
+        size: 'normal',
+        theme: 'auto',
+      })
+    }
+
+    if (document.getElementById('cf-turnstile-script')) {
+      render()
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'cf-turnstile-script'
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    script.onload = render
+    document.head.appendChild(script)
+
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ts = (window as any).turnstile
+      if (ts && widgetIdRef.current) ts.remove(widgetIdRef.current)
+    }
+  }, [containerId])
+
+  return token
+}
 
 // ── Schema ────────────────────────────────────────────────────────
 
@@ -164,6 +215,9 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [globalError, setGlobalError] = useState<string | null>(null)
 
+  // Turnstile bot protection (skipped in dev when VITE_TURNSTILE_SITE_KEY is unset)
+  const turnstileToken = useTurnstile('register-turnstile-widget')
+
   // ── Fetch public webinar info ─────────────────────────────────
 
   const { data: webinarData, isLoading, error } = useQuery({
@@ -195,6 +249,7 @@ export default function RegisterPage() {
           countryCode: data.countryCode || undefined,
           city: data.city || undefined,
           consentMarketing: data.consentMarketing ?? false,
+          ...(turnstileToken ? { cfTurnstileToken: turnstileToken } : {}),
         }),
       })
       const json = await r.json() as {
@@ -385,6 +440,11 @@ export default function RegisterPage() {
                 hint="Optional — unsubscribe anytime"
               />
             </div>
+
+            {/* Turnstile widget — only visible in production when VITE_TURNSTILE_SITE_KEY is set */}
+            {TURNSTILE_SITE_KEY && (
+              <div id="register-turnstile-widget" style={{ margin: '0.5rem 0' }} />
+            )}
 
             <Button
               id="reg-submit"
