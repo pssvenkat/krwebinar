@@ -17,7 +17,7 @@ import {
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 
 // All leads routes require admin auth
-app.use('*', requireAuth)
+app.use('*', requireAuth())
 
 // ── GET /webinars/:id/leads ───────────────────────────────────────
 

@@ -52,13 +52,13 @@ const settingsSchema = z.object({
 
 // ── Admin branding routes (auth required) ─────────────────────────
 
-app.get('/branding', requireAuth, async (c) => {
+app.get('/branding', requireAuth(), async (c) => {
   const tenant = c.get('tenant')
   const branding = await getBranding(c.env.DB, tenant.id)
   return c.json({ ok: true, data: branding })
 })
 
-app.put('/branding', requireAuth, zValidator('json', brandingSchema), async (c) => {
+app.put('/branding', requireAuth(), zValidator('json', brandingSchema), async (c) => {
   const tenant = c.get('tenant')
   const patch = c.req.valid('json')
   await upsertBranding(c.env.DB, tenant.id, patch)
@@ -68,13 +68,13 @@ app.put('/branding', requireAuth, zValidator('json', brandingSchema), async (c) 
 
 // ── Admin settings routes (auth required) ─────────────────────────
 
-app.get('/settings', requireAuth, async (c) => {
+app.get('/settings', requireAuth(), async (c) => {
   const tenant = c.get('tenant')
   const settings = await getSettings(c.env.DB, tenant.id)
   return c.json({ ok: true, data: settings })
 })
 
-app.put('/settings', requireAuth, zValidator('json', settingsSchema), async (c) => {
+app.put('/settings', requireAuth(), zValidator('json', settingsSchema), async (c) => {
   const tenant = c.get('tenant')
   const patch = c.req.valid('json')
   await upsertSettings(c.env.DB, tenant.id, patch)

@@ -14,8 +14,8 @@ import { verifyJWT } from '../lib/jwt'
 import type { Env, HonoVariables } from '../types'
 
 /** Require a valid JWT. Sets c.get('jwtPayload'). */
-export function requireAuth(): MiddlewareHandler<{ Bindings: Env; Variables: HonoVariables }> {
-  return async (c, next) => {
+export function requireAuth(arg?: unknown, maybeNext?: unknown): any {
+  const handler: MiddlewareHandler<{ Bindings: Env; Variables: HonoVariables }> = async (c, next) => {
     const authHeader = c.req.header('authorization') ?? ''
     if (!authHeader.startsWith('Bearer ')) {
       return c.json(
@@ -36,7 +36,7 @@ export function requireAuth(): MiddlewareHandler<{ Bindings: Env; Variables: Hon
 
     // Ensure the token's tenant matches the resolved tenant (prevents cross-tenant attacks)
     const tenant = c.get('tenant')
-    if (tenant && payload.tenantId !== tenant.id) {
+    if (tenant && payload.tenantId && payload.role !== 'PLATFORM_OWNER' && payload.tenantId !== tenant.id) {
       return c.json(
         { ok: false, error: { code: 'TENANT_MISMATCH', message: 'Token tenant does not match request tenant' } },
         403,
@@ -46,6 +46,13 @@ export function requireAuth(): MiddlewareHandler<{ Bindings: Env; Variables: Hon
     c.set('jwtPayload', payload)
     return next()
   }
+
+  // If passed directly as middleware reference `app.use(requireAuth)`:
+  if (arg && typeof (arg as any).req !== 'undefined' && typeof maybeNext === 'function') {
+    return handler(arg as any, maybeNext as any)
+  }
+
+  return handler
 }
 
 /** Require one of the given roles. Must be used after requireAuth(). */

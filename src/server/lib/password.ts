@@ -51,23 +51,27 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const iterations = parseInt(iterStr, 10)
   if (!iterations || !saltHex || !hashHex) return false
 
-  const enc = new TextEncoder()
-  const salt = hexToBuf(saltHex)
+  try {
+    const enc = new TextEncoder()
+    const salt = hexToBuf(saltHex)
 
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), ALG, false, ['deriveBits'])
-  const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    keyMaterial,
-    KEY_LEN * 8,
-  )
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), ALG, false, ['deriveBits'])
+    const derived = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+      keyMaterial,
+      KEY_LEN * 8,
+    )
 
-  const newHash = bufToHex(derived)
+    const newHash = bufToHex(derived)
 
-  // Constant-time comparison
-  if (newHash.length !== hashHex.length) return false
-  let diff = 0
-  for (let i = 0; i < newHash.length; i++) {
-    diff |= newHash.charCodeAt(i) ^ hashHex.charCodeAt(i)
+    // Constant-time comparison
+    if (newHash.length !== hashHex.length) return false
+    let diff = 0
+    for (let i = 0; i < newHash.length; i++) {
+      diff |= newHash.charCodeAt(i) ^ hashHex.charCodeAt(i)
+    }
+    return diff === 0
+  } catch {
+    return false
   }
-  return diff === 0
 }

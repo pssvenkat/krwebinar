@@ -116,14 +116,14 @@ app.notFound((c) => {
 
 // Global error handler
 app.onError((err, c) => {
-  console.error('[Worker Error]', err)
+  console.error('[Worker Error]', err.stack || err)
   return c.json(
     {
       ok: false,
       error: {
         code: 'INTERNAL_ERROR',
-        message:
-          c.env.ENVIRONMENT === 'development' ? err.message : 'An unexpected error occurred',
+        message: err.message,
+        stack: err.stack,
       },
     },
     500,

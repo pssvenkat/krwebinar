@@ -52,8 +52,13 @@ export function tenantMiddleware(): MiddlewareHandler<{ Bindings: Env; Variables
       tenant = await findTenantByDomain(db, host)
     }
 
-    // 4. Localhost dev fallback
-    if (!tenant && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+    // 4. Localhost or Workers.dev dev fallback
+    if (!tenant && (host.includes('localhost') || host.includes('127.0.0.1') || host.includes('.workers.dev') || host.includes('pages.dev'))) {
+      tenant = await findTenantBySlug(db, 'krave')
+    }
+
+    // 5. Default fallback to default tenant if none resolved
+    if (!tenant) {
       tenant = await findTenantBySlug(db, 'krave')
     }
 

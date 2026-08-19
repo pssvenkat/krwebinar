@@ -19,7 +19,7 @@ import {
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 
-app.use('*', requireAuth)
+app.use('*', requireAuth())
 
 // ── Platform analytics ────────────────────────────────────────────
 
