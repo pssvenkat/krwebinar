@@ -5,9 +5,12 @@
 
 ---
 
-## Current Phase: PHASE 14 COMPLETE ✅
+## Current Status: PRODUCTION DEPLOYED & VERIFIED ✅
 
-## Project Status: ALL PLANNED PHASES (0–14) COMPLETED & VERIFIED 🎉
+- **Production URL:** [https://krwebinar.pssvenkat2.workers.dev](https://krwebinar.pssvenkat2.workers.dev)
+- **Active Version ID:** `a84589e8-03e0-4237-be48-0f5dcaa6f91f`
+- **Environment:** `production`
+- **D1 Database:** `krwebinar-db` (`45ff657a-2a70-45f3-8ad0-2364b18ed499`)
 
 ---
 
@@ -15,86 +18,63 @@
 
 | Item | Status |
 |---|---|
-| GitHub repo | Active — 28 commits on `main` |
+| GitHub repo | Active on `main` |
 | Local clone | `c:\Users\venka\.gemini\antigravity\scratch\kfwebinar` |
-| Last commit | `feat: performance optimizations, DO load benchmarks, readiness probe (Phase 14)` — `b2480e9` |
+| Master Test Suite | **157/157 passing tests** across 18 test files |
+| Production Build | Clean build with TypeScript + Vite |
 
 ---
 
-## Phase 14 Summary — Performance Optimization, Load Testing & Launch Readiness
+## Production Deployment & Real-Time Engine Details
 
-### New Files
+### 1. Real-Time WebSocket Engine & Cloudflare Durable Objects
+- **WebSocket Upgrade Proxying**: Preserves native Cloudflare request context via `new Request(doUrl, c.req.raw)`.
+- **Middleware Isolation**: Bypasses header-mutating middleware (`secureHeaders`) on WebSocket upgrades to preserve HTTP 101 Switching Protocols.
+- **Hibernation API Persistence**: Implements `serializeAttachment` and `deserializeAttachment` on WebSocket instances; broadcasts dynamically via `this.state.getWebSockets()`.
 
-| File | Purpose |
-|---|---|
-| `src/durable-objects/WebinarRoom.bench.test.ts` | Concurrency and load testing suite (500 concurrent connections, join storms, broadcast benchmarks) |
-| `src/server/routes/health.test.ts` | Unit tests for `/api/health` and deep `/api/health/ready` probe with D1 latency checks |
+### 2. Interactive Host Studio Controls
+- **Host Name Management**: Instant editing in Studio header with live broadcast to attendee screens (`HOST_NAME_UPDATE`) and D1 persistence.
+- **Interactive Q&A**: Question upvoting, live "Answered Live" flagging, inline text replies (`Enter` key quick-reply, edit capability, cancel toggles) broadcast in real time to attendees.
+- **Live Polling**: Single-click poll creation, real-time vote tallying, and host close-poll controls.
+- **Live Announcements**: Host pinned broadcast announcements with banner overlay on attendee video.
 
-### Modified Files
-
-| File | Change |
-|---|---|
-| `src/durable-objects/WebinarRoom.ts` | Added throttled/coalesced participant count broadcasting (prevents O(N²) message storms during simultaneous viewer joins) |
-| `src/server/routes/health.ts` | Added `/api/health/ready` deep dependency probe measuring D1 query latency |
-| `src/server/index.ts` | Added `Cache-Control: public, max-age=31536000, immutable` headers for client static assets (`/assets/*`) |
-
----
-
-## Verification Results (Phase 14)
-
-| Check | Result |
-|---|---|
-| `tsc --noEmit` | ✅ 0 errors |
-| `eslint` | ✅ 0 errors, 0 warnings |
-| `vitest run` | ✅ **148/148 tests passing** (17 files, +6 new tests) |
-| `vite build` | ✅ 260 modules bundled for production (0 errors) |
-| `git push` | ✅ `b2480e9` |
+### 3. Multi-Tenant Architecture & Auth Compliance
+- **WebCrypto PBKDF2**: Standardized at 100,000 iterations to run seamlessly within Cloudflare Workers edge execution constraints.
+- **Platform Owner Admin**: Platform-wide tenant onboarding, status toggling, and user management.
+- **Tenant Isolation**: Strict `WHERE tenant_id = ?` scoping on all D1 SQL operations.
 
 ---
 
 ## Cumulative Master Test Suite Overview
 
 ```
-17 test files | 148 tests
-  ✓ durable-objects/WebinarRoom.bench.test.ts  3 tests  (Phase 14)
-  ✓ server/routes/health.test.ts               3 tests  (Phase 14)
-  ✓ server/middleware/rate-limit.test.ts       3 tests  (Phase 13)
-  ✓ server/routes/admin/domains.test.ts        5 tests  (Phase 13)
-  ✓ server/routes/platform/tenants.test.ts     5 tests  (Phase 12)
-  ✓ server/routes/admin/leads.test.ts          4 tests  (Phase 11)
-  ✓ server/routes/admin/branding.test.ts       5 tests  (Phase 10)
-  ✓ server/routes/admin/analytics.test.ts      5 tests  (Phase 9)
-  ✓ client/hooks/useWebSocket.test.ts         10 tests  (Phase 8)
-  ✓ server/lib/email-templates.test.ts        18 tests  (Phase 6)
-  ✓ server/routes/public/webinar.test.ts      13 tests  (Phase 4)
-  ✓ shared/schemas/schemas.test.ts            18 tests  (Phase 1)
-  ✓ client/components/ui/components.test.     33 tests  (Phase 2)
-  ✓ server/lib/jwt.test.ts                    10 tests  (Phase 1)
-  ✓ server/lib/password.test.ts                4 tests  (Phase 1)
-  ✓ server/lib/db.test.ts                      3 tests  (Phase 2)
-  ✓ shared/constants/constants.test.ts         6 tests  (Phase 1)
+18 test files | 157 tests
+  ✓ durable-objects/WebinarRoom.bench.test.ts  3 tests  (Load & Concurrency)
+  ✓ server/routes/health.test.ts               3 tests  (Readiness & Liveness Probes)
+  ✓ server/middleware/rate-limit.test.ts       3 tests  (Edge Rate Limiting)
+  ✓ server/routes/admin/domains.test.ts        5 tests  (Custom Domains & SSL)
+  ✓ server/routes/platform/tenants.test.ts     5 tests  (Platform Multi-Tenant CRUD)
+  ✓ server/routes/admin/leads.test.ts          4 tests  (Lead Capture & CSV Export)
+  ✓ server/routes/admin/branding.test.ts       5 tests  (White-Label Custom Branding)
+  ✓ server/routes/admin/analytics.test.ts      5 tests  (Attendance & Engagement Metrics)
+  ✓ client/hooks/useWebSocket.test.ts         18 tests  (WebSocket Backoff, URL Switch, Cleanup)
+  ✓ server/lib/email-templates.test.ts        18 tests  (Transactional Email Builders)
+  ✓ server/routes/public/webinar.test.ts      13 tests  (Registration & Token Auth)
+  ✓ shared/schemas/schemas.test.ts            18 tests  (Zod Validation Schemas)
+  ✓ client/components/ui/components.test.tsx   33 tests  (Design System & Accessible UI)
+  ✓ server/lib/jwt.test.ts                    10 tests  (JWT Sign & Expiration)
+  ✓ server/lib/password.test.ts                4 tests  (WebCrypto PBKDF2 Hash & Verify)
+  ✓ server/lib/db.test.ts                      3 tests  (D1 Query Helpers)
+  ✓ shared/constants/constants.test.ts         6 tests  (Platform Constants & Defaults)
+  ✓ client/App.test.tsx                        1 test   (SPA App Shell & Route Mounting)
 ```
 
 ---
 
-## Complete Phase History (0–14)
+## Quick Reference Links & Credentials
 
-1. **Phase 0** — Discovery, Technical Specs & Architecture Audit
-2. **Phase 1** — Project Foundation, Web Crypto Auth & Schemas
-3. **Phase 2** — Design System & Accessible Component Library
-4. **Phase 3** — Multi-Tenant API & Tenant Resolution Middleware
-5. **Phase 4** — Public Registration Page & Join Token Generator
-6. **Phase 5** — Admin Portal & Webinar Lifecycle Management
-7. **Phase 6** — Transactional Email, Cron Reminders & Unsubscribe
-8. **Phase 7** — Deployment Configuration, D1 Migrations & Turnstile
-9. **Phase 8** — Durable Objects Real-Time Chat & Viewer Tracking
-10. **Phase 9** — Analytics Dashboard & Attendance Reports
-11. **Phase 10** — Tenant Branding, Custom Colors & Live CSS Variable Injection
-12. **Phase 11** — Post-Webinar Feedback Survey & Lead Capture
-13. **Phase 12** — Platform Owner Admin & Tenant Onboarding
-14. **Phase 13** — Custom Domains, SSL & Edge Rate Limiting
-15. **Phase 14** — Performance Optimization, Load Benchmarks & Readiness Probes
-
----
-
-*All phases 0 through 14 are fully implemented, tested, verified, and committed to main.*
+- **Live URL:** `https://krwebinar.pssvenkat2.workers.dev`
+- **Tenant Admin:** `admin@kravemicrogreens.in` / `ChangeMe123!`
+- **Platform Owner:** `owner@krwebinar.com` / `ChangeMe123!`
+- **Demo Live Webinar:** `https://krwebinar.pssvenkat2.workers.dev/w/01HZ0000000000000000000005`
+- **Admin Studio:** `https://krwebinar.pssvenkat2.workers.dev/admin/webinars/01HZ0000000000000000000005/studio`

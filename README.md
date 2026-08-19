@@ -152,40 +152,58 @@ Value: v=DKIM1; p=... (get from MailChannels docs)
 
 ---
 
+## Live Production Deployment
+
+- **Production URL:** [https://krwebinar.pssvenkat2.workers.dev](https://krwebinar.pssvenkat2.workers.dev)
+- **Runtime:** Cloudflare Workers + Durable Objects + D1 SQLite
+- **Database:** `krwebinar-db` (D1)
+- **Active Version:** `a84589e8-03e0-4237-be48-0f5dcaa6f91f`
+
+Default demo credentials:
+- **Tenant Admin:** `admin@kravemicrogreens.in` / `ChangeMe123!`
+- **Platform Owner:** `owner@krwebinar.com` / `ChangeMe123!`
+- **Demo Live Webinar:** [https://krwebinar.pssvenkat2.workers.dev/w/01HZ0000000000000000000005](https://krwebinar.pssvenkat2.workers.dev/w/01HZ0000000000000000000005)
+
+---
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Browser (React SPA — Vite)                                 │
-│  /admin/* → AdminLayout (auth-guarded)                      │
-│  /register/:id → RegisterPage (public)                      │
-│  /w/:token → AttendPage (YouTube player)                    │
+│  /admin/*           → AdminLayout & Studio (auth-guarded)   │
+│  /platform/*        → Platform Owner Dashboard              │
+│  /register/:id      → RegisterPage (public)                 │
+│  /w/:token          → AttendPage (YouTube + Real-Time DO)   │
 └──────────────────────┬──────────────────────────────────────┘
-                       │ fetch /api/v1/*
+                       │ fetch /api/v1/*  &  WebSocket /api/v1/ws/*
 ┌──────────────────────▼──────────────────────────────────────┐
 │  Cloudflare Worker (Hono)                                   │
-│  ├── /api/v1/auth/*         → Auth (JWT + refresh cookie)   │
-│  ├── /api/v1/admin/*        → Admin routes (requireAuth)    │
+│  ├── /api/v1/auth/*         → Auth (JWT + WebCrypto PBKDF2) │
+│  ├── /api/v1/admin/*        → Tenant Admin (requireAuth)    │
+│  ├── /api/v1/platform/*     → Platform Owner Multi-Tenant   │
 │  ├── /api/v1/webinars/*     → Public registration          │
 │  ├── /api/v1/attend/*       → Attend token validation       │
+│  ├── /api/v1/ws/webinar/*   → WebSocket Upgrade to DO       │
 │  ├── /api/v1/unsubscribe/*  → Email opt-out (DPDP)          │
 │  └── scheduled              → Cron: 30-min reminders        │
 │                                                             │
 │  Bindings:                                                  │
 │  ├── D1 (DB)                → SQLite database               │
 │  ├── R2 (ASSETS_BUCKET)     → Logo/favicon storage          │
-│  └── DO (WEBINAR_ROOM)      → Durable Object (live state)   │
+│  └── DO (WEBINAR_ROOM)      → WebinarRoom Durable Object    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Multi-Tenancy
+### Multi-Tenancy & Real-Time Engine
 
-Every request is tenant-resolved via `TenantMiddleware`:
-1. Reads `X-Tenant-Slug` header (dev) or hostname (prod)
-2. Looks up tenant in D1
-3. Sets `c.get('tenant')` — available in all route handlers
-
-All D1 queries include `WHERE tenant_id = ?` for data isolation.
+1. **Tenant Resolution**:
+   - Reads `X-Tenant-Slug` header (dev) or hostname/custom domain (prod).
+   - All D1 queries enforce `WHERE tenant_id = ?` for strict data isolation.
+2. **Durable Objects Real-Time Room (`WebinarRoom`)**:
+   - Deterministic room ID: `{tenantId}:{webinarId}`.
+   - Cloudflare WebSocket Hibernation API with `serializeAttachment` and `state.getWebSockets()`.
+   - Real-time live chat, interactive live polls, upvotable Q&A with written host answers, live viewer count, and pinned announcements.
 
 ---
 
@@ -201,28 +219,36 @@ Powered by MailChannels (free via Cloudflare Workers):
 | Webinar ended | Feedback request (attended only) |
 | New registration | Vendor admin alert |
 
-Cron runs every 15 minutes (`*/15 * * * *`) and dispatches reminders for webinars starting in 25–35 minutes.
-
-All emails include a one-click unsubscribe link compliant with RFC 8058 and Indian DPDP Act 2023.
+Cron runs every 15 minutes (`*/15 * * * *`) and dispatches reminders for webinars starting in 25–35 minutes. All emails include a one-click unsubscribe link compliant with RFC 8058 and Indian DPDP Act 2023.
 
 ---
 
 ## Test Suite
 
 ```bash
-npm test     # 105 tests across 8 files
+npm test     # 157 tests across 18 test files
 ```
 
-| File | Tests | Coverage |
+| File | Tests | Coverage Area |
 |---|---|---|
-| `email-templates.test.ts` | 18 | All 5 email builders |
-| `webinar.test.ts` | 13 | Registration routes |
-| `schemas.test.ts` | 18 | Zod schema validation |
-| `components.test.tsx` | 33 | UI component library |
-| `jwt.test.ts` | 10 | JWT sign/verify |
-| `password.test.ts` | 4 | PBKDF2 hash/verify |
-| `db.test.ts` | 3 | DB helpers |
-| `constants.test.ts` | 6 | Shared constants |
+| `durable-objects/WebinarRoom.bench.test.ts` | 3 | Concurrency benchmark & 500 participant load |
+| `server/routes/health.test.ts` | 3 | Shallow probe & deep D1 latency check |
+| `server/middleware/rate-limit.test.ts` | 3 | Edge rate limiter & sliding window |
+| `server/routes/admin/domains.test.ts` | 5 | Custom domain verification & SSL |
+| `server/routes/platform/tenants.test.ts` | 5 | Platform owner multi-tenant management |
+| `server/routes/admin/leads.test.ts` | 4 | CSV export & lead filtering |
+| `server/routes/admin/branding.test.ts` | 5 | Tenant branding & CSS variable injection |
+| `server/routes/admin/analytics.test.ts` | 5 | Attendance rates & engagement analytics |
+| `client/hooks/useWebSocket.test.ts` | 18 | WebSocket reconnection, backoff, cleanup |
+| `server/lib/email-templates.test.ts` | 18 | All 5 transactional email builders |
+| `server/routes/public/webinar.test.ts` | 13 | Registration & attendee token validation |
+| `shared/schemas/schemas.test.ts` | 18 | Zod schema validation rules |
+| `client/components/ui/components.test.tsx` | 33 | Design system & accessible UI library |
+| `server/lib/jwt.test.ts` | 10 | JWT sign, verify, and expiration |
+| `server/lib/password.test.ts` | 4 | PBKDF2 WebCrypto hash & verify |
+| `server/lib/db.test.ts` | 3 | D1 database helpers |
+| `shared/constants/constants.test.ts` | 6 | Platform constants & default configs |
+| `client/App.test.tsx` | 1 | SPA route rendering & auth provider |
 
 ---
 
@@ -231,33 +257,40 @@ npm test     # 105 tests across 8 files
 ```bash
 npm run dev          # Vite dev server (port 5173)
 npm run dev:worker   # Wrangler dev (port 8787)
-npm run build        # Production build
-npm test             # Run all tests
+npm run build        # Production bundle (tsc + vite)
+npm test             # Vitest test suite
 npm run lint         # ESLint
 npx tsx scripts/hash-password.ts <password>   # Generate PBKDF2 hash
 ```
 
 ---
 
-## Phases
+## Complete Phase Roadmap
 
 | Phase | Description | Status |
 |---|---|---|
-| 0 | Project foundation + audit | ✅ |
-| 1 | Design system | ✅ |
-| 2 | UI component library | ✅ |
-| 3 | Multi-tenant API + Auth + Webinar CRUD | ✅ |
-| 4 | Public registration + Attend + Feedback | ✅ |
-| 5 | Admin dashboard + Webinar management UI | ✅ |
-| 6 | Email notifications + Cron + Unsubscribe | ✅ |
-| 7 | Cloudflare deployment + Production config | ✅ |
+| 0 | Project foundation + architecture audit | ✅ |
+| 1 | Web Crypto Auth, JWT, & Zod schemas | ✅ |
+| 2 | Accessible UI component library & Design system | ✅ |
+| 3 | Multi-tenant API + Tenant resolution middleware | ✅ |
+| 4 | Public registration + Attend + Feedback flow | ✅ |
+| 5 | Admin dashboard + Webinar lifecycle management | ✅ |
+| 6 | Transactional email + Cron reminders + Unsubscribe | ✅ |
+| 7 | Cloudflare deployment + D1 migrations + Turnstile | ✅ |
+| 8 | Durable Objects WebSocket real-time chat & state | ✅ |
+| 9 | Analytics dashboard + CSV export + Attendance metrics | ✅ |
+| 10 | White-label tenant branding & live theme injection | ✅ |
+| 11 | Post-webinar feedback surveys & lead capture | ✅ |
+| 12 | Platform owner dashboard & Tenant provisioning | ✅ |
+| 13 | Custom domain SSL management & Edge rate limiting | ✅ |
+| 14 | Performance optimization, load benchmarks, & readiness | ✅ |
 
 ---
 
-## Security Notes
+## Security & Compliance
 
-- JWT: HS256, 15-minute access tokens, 7-day httpOnly refresh cookies (rotated on use)
-- Passwords: PBKDF2-SHA256, 310,000 iterations, 16-byte random salt
-- Turnstile: bot protection on registration form (server-side verified)
-- All D1 queries use parameterised statements (no SQL injection)
-- DPDP compliant: explicit consent, one-click unsubscribe, no data sharing
+- **JWT Auth**: HS256, 15-minute access tokens, 7-day httpOnly refresh cookies.
+- **Passwords**: PBKDF2-SHA256, 100,000 iterations (Cloudflare WebCrypto standard), 16-byte random salt.
+- **Turnstile**: Bot protection on public registration (server-side verified).
+- **Tenant Isolation**: Server-enforced `WHERE tenant_id = ?` scoping on all queries.
+- **DPDP Act 2023**: Explicit consent recording, one-click unsubscribe headers (RFC 8058), data erasure endpoints.

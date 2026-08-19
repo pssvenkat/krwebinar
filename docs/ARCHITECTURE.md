@@ -281,6 +281,46 @@ No video proxying. No media server. YouTube handles all streaming.
 
 ---
 
+---
+
+## Real-Time Engine (Cloudflare Durable Objects)
+
+The platform utilizes Cloudflare Durable Objects (`WebinarRoom`) with the **WebSocket Hibernation API** for zero-idle-cost real-time state synchronization:
+
+```
+Participant / Host Browser (WebSocket)
+            │
+            ▼ (HTTP Upgrade GET /api/v1/ws/webinar/:id/ws)
+Cloudflare Worker (Hono Route)
+   ├── Authenticates token / session
+   ├── Bypasses header mutation middleware
+   └── Proxies Request: stub.fetch(new Request(doUrl, c.req.raw))
+            │
+            ▼
+Durable Object instance: {tenantId}:{webinarId}
+   ├── state.acceptWebSocket(server, [sessionId])
+   ├── server.serializeAttachment({ sessionId, name, isHost })
+   ├── Manages in-memory state (Chat, Polls, Q&A, Host Name, Announcements)
+   └── Broadcasts via state.getWebSockets()
+```
+
+### Real-Time Protocol & Event Schemas
+
+| Event Type | Direction | Payload Description |
+|---|---|---|
+| `JOIN` / `GET_STATE` | Client → DO | Request current room state snapshot |
+| `ROOM_STATE` | DO → Client | Full room snapshot (`chatHistory`, `polls`, `questions`, `hostName`, `pinnedAnnouncement`, `viewerCount`) |
+| `CHAT_MESSAGE` | Bidirectional | Chat entry with participant name, content, timestamp, and host badge |
+| `POLL_CREATE` / `POLL_STARTED` | Bidirectional | Live poll creation with choices and initial 0-count tallies |
+| `POLL_VOTE` / `POLL_UPDATED` | Bidirectional | Real-time option vote increment and aggregated distribution |
+| `QUESTION_CREATE` / `QUESTION_CREATED` | Bidirectional | Question submitted by participant with author metadata |
+| `QUESTION_VOTE` / `QUESTION_UPDATED` | Bidirectional | Upvote tally increment for priority sorting |
+| `QUESTION_ANSWER` / `QUESTION_UPDATED` | Bidirectional | Host written answer or "Answered Live" flag broadcast to room |
+| `HOST_NAME_UPDATE` / `HOST_NAME_UPDATED` | Bidirectional | Dynamic host name change broadcast to attendee header |
+| `ANNOUNCEMENT` | DO → Client | Pinned banner announcement broadcast to all viewers |
+
+---
+
 ## Database Architecture (D1)
 
 All tables include:
@@ -295,21 +335,7 @@ Key tables:
 - `tenant_settings` — feature flags per tenant
 - `users` — admin users (VENDOR_OWNER, VENDOR_ADMIN, etc.)
 - `webinars` — webinar records
-- `participants` — registered participant profiles
-- `registrations` — webinar registration records
-- `consent_records` — granular consent tracking
-- `participant_sessions` — secure session tokens
-- `attendance_sessions` — join/leave/heartbeat tracking
-- `chat_messages` — persisted chat (optional, rate-limited)
-- `questions` — Q&A questions
-- `question_votes` — upvotes per question
-- `polls` — poll definitions
-- `poll_options` — poll choices
-- `poll_votes` — participant votes
+- `webinar_registrations` — webinar registration records
+- `leads` — post-webinar qualified leads
 - `feedback` — post-webinar ratings and suggestions
-- `lead_interests` — interest categories per participant
-- `privacy_requests` — DPDP data rights requests
-- `audit_logs` — immutable action audit trail
-- `security_incidents` — security event log
-
-Full schema in `docs/DATABASE_SCHEMA.md` (Phase 25).
+- `domains` — custom domain configurations
