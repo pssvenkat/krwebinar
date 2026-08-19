@@ -1,15 +1,18 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   useWebinar, useRegistrations, usePublishWebinar,
   useGoLiveWebinar, useEndWebinar, useArchiveWebinar
 } from '../../hooks/useWebinars'
+import { useLeads, downloadLeadsCsv } from '../../hooks/useLeads'
+import type { Lead, LeadsSummary } from '../../hooks/useLeads'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import type { BadgeVariant } from '../../components/ui/Badge'
 import type { Registration } from '../../hooks/useWebinars'
 
-// ── CSV export ────────────────────────────────────────────────────
+// ── CSV export (registrations) ────────────────────────────────────
 
 function exportCSV(registrations: Registration[], title: string) {
   const header = 'Name,Email,Phone,Country,City,Registered At,Attended'
@@ -63,7 +66,8 @@ function StatusControls({ id, status }: { id: string; status: string }) {
             <Button id="ctrl-edit" variant="secondary" size="sm" onClick={() => navigate(`/admin/webinars/${id}/edit`)}>
               Edit
             </Button>
-            <Button id="ctrl-publish" variant="primary" size="sm" loading={publish.isPending} onClick={() => void publish.mutateAsync(id)}>
+            <Button id="ctrl-publish" variant="primary" size="sm" loading={isPending}
+              onClick={() => publish.mutate(id)}>
               Publish
             </Button>
           </>
@@ -73,59 +77,42 @@ function StatusControls({ id, status }: { id: string; status: string }) {
             <Button id="ctrl-edit" variant="secondary" size="sm" onClick={() => navigate(`/admin/webinars/${id}/edit`)}>
               Edit
             </Button>
-            <Button
-              id="ctrl-live"
-              variant="primary"
-              size="sm"
-              loading={goLive.isPending}
-              disabled={isPending}
-              onClick={() => void goLive.mutateAsync(id)}
-              className="btn-live"
-            >
-              🔴 Go Live
+            <Button id="ctrl-golive" variant="primary" size="sm" loading={isPending}
+              onClick={() => goLive.mutate(id)}>
+              Go Live
             </Button>
           </>
         )}
         {status === 'LIVE' && (
-          <Button
-            id="ctrl-end"
-            variant="secondary"
-            size="sm"
-            loading={end.isPending}
-            disabled={isPending}
-            onClick={() => { if (window.confirm('End this webinar?')) void end.mutateAsync(id) }}
-          >
-            End webinar
+          <Button id="ctrl-end" variant="secondary" size="sm" loading={isPending}
+            onClick={() => end.mutate(id)}>
+            End Webinar
           </Button>
         )}
         {status === 'ENDED' && (
-          <Button
-            id="ctrl-archive"
-            variant="ghost"
-            size="sm"
-            loading={archive.isPending}
-            disabled={isPending}
-            onClick={() => void archive.mutateAsync(id)}
-          >
-            Archive
-          </Button>
+          <>
+            <Button id="ctrl-archive" variant="ghost" size="sm" loading={isPending}
+              onClick={() => archive.mutate(id)}>
+              Archive
+            </Button>
+            <Button id="ctrl-analytics" variant="secondary" size="sm"
+              onClick={() => navigate(`/admin/webinars/${id}/analytics`)}>
+              View Analytics
+            </Button>
+          </>
         )}
       </div>
     </div>
   )
 }
 
-// ── Registration table ────────────────────────────────────────────
+// ── Registrations table ────────────────────────────────────────────
 
 function RegistrationsTable({ registrations, title }: { registrations: Registration[]; title: string }) {
-  if (registrations.length === 0) {
-    return <p className="admin-empty-subtitle">No registrations yet.</p>
-  }
-
   return (
     <>
-      <div className="admin-section-header" style={{ marginBottom: '1rem' }}>
-        <span className="admin-section-count">{registrations.length} registrations</span>
+      <div className="admin-section-header">
+        <span className="admin-table-count">{registrations.length} registrant{registrations.length !== 1 ? 's' : ''}</span>
         <Button
           id="export-csv"
           variant="ghost"
@@ -167,11 +154,129 @@ function RegistrationsTable({ registrations, title }: { registrations: Registrat
   )
 }
 
+// ── Stars display ─────────────────────────────────────────────────
+
+function Stars({ rating }: { rating: number | null }) {
+  if (rating === null) return <span className="leads-no-rating">—</span>
+  return (
+    <span className="leads-stars" aria-label={`${rating} out of 5 stars`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < rating ? 'leads-star--filled' : 'leads-star--empty'}>★</span>
+      ))}
+    </span>
+  )
+}
+
+// ── Leads panel ───────────────────────────────────────────────────
+
+const INTEREST_BADGE: Record<string, BadgeVariant> = {
+  hot: 'error', warm: 'warning', cold: 'secondary',
+}
+
+function LeadsPanel({ webinarId }: { webinarId: string }) {
+  const { data, isLoading, error } = useLeads(webinarId)
+
+  if (isLoading) return <LoadingState label="Loading leads…" />
+  if (error) return <ErrorState error={error as Error} />
+
+  const leads = data?.leads ?? []
+  const summary: LeadsSummary | undefined = data?.summary
+
+  return (
+    <>
+      {summary && (
+        <div className="leads-summary">
+          <div className="leads-kpi">
+            <p className="leads-kpi-label">Total Leads</p>
+            <p className="leads-kpi-value">{summary.totalLeads}</p>
+          </div>
+          <div className="leads-kpi">
+            <p className="leads-kpi-label">Avg Rating</p>
+            <p className="leads-kpi-value">
+              {summary.avgRating !== null ? `${summary.avgRating} ★` : '—'}
+            </p>
+          </div>
+          <div className="leads-kpi">
+            <p className="leads-kpi-label">Follow-up Requested</p>
+            <p className="leads-kpi-value">{summary.contactRequested}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="admin-section-header">
+        <span className="admin-table-count">{leads.length} lead{leads.length !== 1 ? 's' : ''}</span>
+        <Button
+          id="export-leads-csv"
+          variant="ghost"
+          size="sm"
+          onClick={() => downloadLeadsCsv(webinarId)}
+        >
+          ↓ Export CSV
+        </Button>
+      </div>
+
+      {leads.length === 0 ? (
+        <div className="leads-empty">
+          <p>No feedback submitted yet.</p>
+          <p className="leads-empty-hint">Leads appear here once attendees complete the post-webinar feedback form.</p>
+        </div>
+      ) : (
+        <div className="admin-table-wrapper">
+          <table className="admin-table leads-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Rating</th>
+                <th>Interests</th>
+                <th>Follow-up</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((lead: Lead) => (
+                <tr key={lead.id} className="admin-table-row">
+                  <td><span className="admin-table-title">{lead.name}</span></td>
+                  <td><a href={`mailto:${lead.email}`} className="admin-link">{lead.email}</a></td>
+                  <td><Stars rating={lead.rating} /></td>
+                  <td>
+                    <div className="leads-interests">
+                      {lead.interests.length > 0
+                        ? lead.interests.map((tag: string) => (
+                          <Badge key={tag} variant={INTEREST_BADGE[tag] ?? 'default'}>
+                            {tag.replace(/_/g, ' ')}
+                          </Badge>
+                        ))
+                        : <span className="leads-no-rating">—</span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <Badge variant={lead.contact_requested ? 'primary' : 'default'}>
+                      {lead.contact_requested ? `Yes (${lead.preferred_contact ?? 'any'})` : 'No'}
+                    </Badge>
+                  </td>
+                  <td className="admin-table-date">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────
+
+type Tab = 'registrations' | 'leads'
 
 export default function AdminWebinarDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [tab, setTab] = useState<Tab>('registrations')
 
   const { data: webinar, isLoading, error } = useWebinar(id)
   const { data: regData, isLoading: regsLoading } = useRegistrations(id)
@@ -185,12 +290,10 @@ export default function AdminWebinarDetailPage() {
 
   return (
     <div className="admin-webinar-detail">
-      {/* Back */}
       <button type="button" className="admin-back-link" onClick={() => navigate('/admin/webinars')}>
         ← Webinars
       </button>
 
-      {/* Header */}
       <div className="admin-page-header">
         <div style={{ flex: 1 }}>
           <h1 className="admin-page-title">{w.title}</h1>
@@ -201,10 +304,8 @@ export default function AdminWebinarDetailPage() {
         </div>
       </div>
 
-      {/* Status controls */}
       <StatusControls id={id!} status={w.status} />
 
-      {/* Info grid */}
       <div className="admin-detail-grid">
         <div className="admin-detail-card">
           <h3 className="admin-detail-card-title">Registration Link</h3>
@@ -239,17 +340,40 @@ export default function AdminWebinarDetailPage() {
         </div>
       </div>
 
-      {/* Registrations */}
+      {/* Tabs: Registrations | Leads */}
       <div className="admin-section">
-        <h2 className="admin-section-title">Registrations</h2>
-        {regsLoading ? (
-          <LoadingState label="Loading registrations…" />
-        ) : (
-          <RegistrationsTable
-            registrations={regData?.registrations ?? []}
-            title={w.title}
-          />
-        )}
+        <div className="admin-tabs">
+          <button
+            type="button"
+            className={`admin-tab${tab === 'registrations' ? ' admin-tab--active' : ''}`}
+            onClick={() => setTab('registrations')}
+          >
+            Registrations
+            <span className="admin-tab-count">{regData?.registrations?.length ?? 0}</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-tab${tab === 'leads' ? ' admin-tab--active' : ''}`}
+            onClick={() => setTab('leads')}
+          >
+            Leads &amp; Feedback
+          </button>
+        </div>
+
+        <div className="admin-tab-content">
+          {tab === 'registrations' ? (
+            regsLoading ? (
+              <LoadingState label="Loading registrations…" />
+            ) : (
+              <RegistrationsTable
+                registrations={regData?.registrations ?? []}
+                title={w.title}
+              />
+            )
+          ) : (
+            <LeadsPanel webinarId={id!} />
+          )}
+        </div>
       </div>
     </div>
   )

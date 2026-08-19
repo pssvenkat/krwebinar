@@ -923,3 +923,130 @@ export async function getPublicBranding(
     platformName: tenant?.name ?? 'Webinar Platform',
   }
 }
+
+// ── Phase 11: Leads helpers ───────────────────────────────────────
+
+export interface LeadRow {
+  id: string
+  name: string
+  email: string
+  phone_e164: string | null
+  country_code: string | null
+  interests: string   // JSON array as string
+  rating: number | null
+  suggestion: string | null
+  contact_requested: number
+  preferred_contact: string | null
+  created_at: string
+}
+
+export interface LeadsSummary {
+  totalLeads: number
+  avgRating: number | null
+  contactRequested: number
+  ratingCounts: { rating: number; count: number }[]
+}
+
+/** Paginated leads list for a webinar */
+export async function getLeadsForWebinar(
+  db: D1Database,
+  webinarId: string,
+  tenantId: string,
+  limit = 100,
+  offset = 0,
+): Promise<{ leads: LeadRow[]; total: number }> {
+  const [rows, countRow] = await Promise.all([
+    db
+      .prepare(
+        `SELECT id, name, email, phone_e164, country_code, interests,
+                rating, suggestion, contact_requested, preferred_contact, created_at
+         FROM lead_captures
+         WHERE webinar_id = ? AND tenant_id = ?
+         ORDER BY created_at DESC
+         LIMIT ? OFFSET ?`,
+      )
+      .bind(webinarId, tenantId, limit, offset)
+      .all<LeadRow>(),
+    db
+      .prepare('SELECT COUNT(*) as count FROM lead_captures WHERE webinar_id = ? AND tenant_id = ?')
+      .bind(webinarId, tenantId)
+      .first<{ count: number }>(),
+  ])
+
+  return { leads: rows.results, total: countRow?.count ?? 0 }
+}
+
+/** Aggregated stats for a webinar's leads */
+export async function getLeadsSummary(
+  db: D1Database,
+  webinarId: string,
+  tenantId: string,
+): Promise<LeadsSummary> {
+  const [totals, ratings] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) as total,
+                ROUND(AVG(CAST(rating AS REAL)), 1) as avg_rating,
+                SUM(contact_requested) as contact_count
+         FROM lead_captures
+         WHERE webinar_id = ? AND tenant_id = ?`,
+      )
+      .bind(webinarId, tenantId)
+      .first<{ total: number; avg_rating: number | null; contact_count: number }>(),
+    db
+      .prepare(
+        `SELECT rating, COUNT(*) as count
+         FROM lead_captures
+         WHERE webinar_id = ? AND tenant_id = ? AND rating IS NOT NULL
+         GROUP BY rating
+         ORDER BY rating DESC`,
+      )
+      .bind(webinarId, tenantId)
+      .all<{ rating: number; count: number }>(),
+  ])
+
+  return {
+    totalLeads: totals?.total ?? 0,
+    avgRating: totals?.avg_rating ?? null,
+    contactRequested: totals?.contact_count ?? 0,
+    ratingCounts: ratings.results,
+  }
+}
+
+/** CSV export rows for leads */
+export async function getLeadsCsvRows(
+  db: D1Database,
+  webinarId: string,
+  tenantId: string,
+): Promise<{
+  name: string; email: string; phone: string; country: string
+  rating: string; suggestion: string; interests: string
+  contact_requested: string; preferred_contact: string; created_at: string
+}[]> {
+  const result = await db
+    .prepare(
+      `SELECT name, email, phone_e164, country_code,
+              rating, suggestion, interests,
+              contact_requested, preferred_contact, created_at
+       FROM lead_captures
+       WHERE webinar_id = ? AND tenant_id = ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(webinarId, tenantId)
+    .all<LeadRow>()
+
+  return result.results.map((r) => ({
+    name: r.name,
+    email: r.email,
+    phone: r.phone_e164 ?? '',
+    country: r.country_code ?? '',
+    rating: r.rating !== null ? String(r.rating) : '',
+    suggestion: r.suggestion ?? '',
+    interests: (() => {
+      try { return JSON.parse(r.interests).join('; ') } catch { return '' }
+    })(),
+    contact_requested: r.contact_requested ? 'Yes' : 'No',
+    preferred_contact: r.preferred_contact ?? '',
+    created_at: r.created_at,
+  }))
+}

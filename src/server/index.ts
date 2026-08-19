@@ -8,6 +8,7 @@ import { webinarAdminRoutes } from './routes/admin/webinars'
 import { registrationAdminRoutes } from './routes/admin/registrations'
 import { analyticsRoutes } from './routes/admin/analytics'
 import { brandingRoutes } from './routes/admin/branding'
+import { leadsRoutes } from './routes/admin/leads'
 import { publicWebinarRoutes } from './routes/public/webinar'
 import { unsubscribeRoutes } from './routes/public/unsubscribe'
 import { wsRoutes } from './routes/attend/ws'
@@ -66,6 +67,7 @@ app.route('/api/v1/admin/webinars', registrationAdminRoutes)
 app.route('/api/v1/admin', analyticsRoutes)
 app.route('/api/v1/admin', brandingRoutes)
 app.route('/api/v1', brandingRoutes)    // serves /api/v1/public/branding (no auth)
+app.route('/api/v1/admin', leadsRoutes)
 
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)
