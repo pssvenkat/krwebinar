@@ -53,10 +53,8 @@ async function _fetch<T>(path: string, options: FetchOptions = {}): Promise<ApiR
     headers['Authorization'] = `Bearer ${_accessToken}`
   }
 
-  // Dev: inject tenant slug via header
-  if (tenantSlug) {
-    headers['X-Tenant-Slug'] = tenantSlug
-  }
+  // Dev: inject tenant slug via header (defaults to krave)
+  headers['X-Tenant-Slug'] = tenantSlug || headers['X-Tenant-Slug'] || 'krave'
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...rest,

@@ -52,6 +52,11 @@ export function tenantMiddleware(): MiddlewareHandler<{ Bindings: Env; Variables
       tenant = await findTenantByDomain(db, host)
     }
 
+    // 4. Localhost dev fallback
+    if (!tenant && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+      tenant = await findTenantBySlug(db, 'krave')
+    }
+
     if (!tenant) {
       return c.json({ ok: false, error: { code: 'TENANT_NOT_FOUND', message: 'Tenant not found' } }, 404)
     }

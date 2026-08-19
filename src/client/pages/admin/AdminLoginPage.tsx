@@ -20,7 +20,11 @@ export default function AdminLoginPage() {
     try {
       const result = await login(email, password)
       if (result.ok) {
-        navigate('/admin', { replace: true })
+        if (result.user?.role === 'PLATFORM_OWNER') {
+          navigate('/platform/tenants', { replace: true })
+        } else {
+          navigate('/admin', { replace: true })
+        }
       } else {
         setError(result.error ?? 'Login failed. Check your credentials.')
       }

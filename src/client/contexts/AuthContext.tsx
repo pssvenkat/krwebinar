@@ -26,7 +26,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string; user?: AuthUser }>
   logout: () => Promise<void>
 }
 
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setAccessToken(result.data.accessToken)
     setState({ user: result.data.user, isAuthenticated: true, isLoading: false })
-    return { ok: true }
+    return { ok: true, user: result.data.user }
   }, [])
 
   const logout = useCallback(async () => {

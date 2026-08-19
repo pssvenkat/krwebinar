@@ -34,8 +34,11 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   const tenant = c.get('tenant')
   const db = c.env.DB
 
-  // Look up user scoped to this tenant
-  const user = await findUserByEmail(db, tenant.id, email)
+  // Look up user scoped to this tenant, or check for platform owner
+  let user = await findUserByEmail(db, tenant.id, email)
+  if (!user) {
+    user = await findUserByEmail(db, null, email)
+  }
 
   if (!user) {
     // Timing-safe: always run a hash check even on miss
