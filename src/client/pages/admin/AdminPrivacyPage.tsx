@@ -55,13 +55,13 @@ export default function AdminPrivacyPage() {
             id="enforce-consent"
             label="Enforce explicit opt-in consent for marketing and follow-ups on all registration pages."
             checked={consentEnforced}
-            onChange={setConsentEnforced}
+            onChange={(e) => setConsentEnforced(e.target.checked)}
           />
           <Checkbox
             id="mask-pii"
             label="Mask phone numbers and email identifiers in audit trails and staff moderator views."
             checked={maskPii}
-            onChange={setMaskPii}
+            onChange={(e) => setMaskPii(e.target.checked)}
           />
         </div>
 

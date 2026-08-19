@@ -11,13 +11,13 @@ directory = "./dist/client"
 [[d1_databases]]
 binding = "DB"
 database_name = "krwebinar-db"
-database_id = "placeholder-update-after-creation"
+database_id = "45ff657a-2a70-45f3-8ad0-2364b18ed499"
 migrations_dir = "db/migrations"
 
-# R2 Bucket for assets (logos, favicons)
-[[r2_buckets]]
-binding = "ASSETS_BUCKET"
-bucket_name = "krwebinar-assets"
+# R2 Bucket for assets (uncomment once R2 is enabled in dashboard)
+# [[r2_buckets]]
+# binding = "ASSETS_BUCKET"
+# bucket_name = "krwebinar-assets"
 
 # Durable Objects
 [[durable_objects.bindings]]
@@ -26,7 +26,7 @@ class_name = "WebinarRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["WebinarRoom"]
+new_sqlite_classes = ["WebinarRoom"]
 
 # Environment variables (non-secret)
 [vars]

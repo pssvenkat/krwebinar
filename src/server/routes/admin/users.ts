@@ -44,12 +44,12 @@ const addMemberSchema = z.object({
 adminUserRoutes.post('/', zValidator('json', addMemberSchema), async (c) => {
   const tenant = c.get('tenant')
   const data = c.req.valid('json')
-  const { generateUlid } = await import('../../lib/ulid')
+  const { ulid } = await import('ulid')
   const passwordHash = await hashPassword(data.password)
 
   try {
     const user = await createUser(c.env.DB, {
-      id: generateUlid(),
+      id: ulid(),
       tenantId: tenant.id,
       name: data.name,
       email: data.email,

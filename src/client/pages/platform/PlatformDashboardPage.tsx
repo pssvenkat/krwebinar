@@ -11,7 +11,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { usePlatformTenants, useUpdateTenantStatus } from '../../hooks/usePlatformTenants'
 import type { PlatformTenant } from '../../hooks/usePlatformTenants'
 import { Badge } from '../../components/ui/Badge'
@@ -115,7 +115,6 @@ function calculateTrialDays(createdAt: string, status: string, plan: string): st
 }
 
 export default function PlatformDashboardPage() {
-  const qc = useQueryClient()
   const navigate = useNavigate()
   const updateStatus = useUpdateTenantStatus()
 

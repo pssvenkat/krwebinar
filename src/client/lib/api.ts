@@ -266,6 +266,7 @@ export interface CreateWebinarInput {
   timezone: string
   maxParticipants?: number
   youtubeVideoId?: string
+  registrationOpen?: boolean
 }
 
 export interface PlatformAnalytics {

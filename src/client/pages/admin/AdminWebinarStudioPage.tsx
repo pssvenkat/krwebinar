@@ -1,11 +1,9 @@
-/// <reference types="vite/client" />
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import { useWebinar, useEndWebinar, useGoLiveWebinar } from '../../hooks/useWebinars'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { LoadingState, ErrorState } from '../../components/ui/States'
-import { useWebSocket } from '../../hooks/useWebSocket'
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -38,7 +36,6 @@ interface StudioQuestion {
 
 export default function AdminWebinarStudioPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
 
   const { data: webinar, isLoading, error } = useWebinar(id)
   const endWebinar = useEndWebinar()
@@ -47,7 +44,7 @@ export default function AdminWebinarStudioPage() {
   // Studio tabs & state
   const [activeTab, setActiveTab] = useState<'chat' | 'polls' | 'qna' | 'attendees'>('chat')
   const [durationSeconds, setDurationSeconds] = useState(742) // 12m 22s initial demo timer
-  const [viewerCount, setViewerCount] = useState(18)
+  const [viewerCount] = useState(18)
   const [chatEnabled, setChatEnabled] = useState(true)
   const [chatDraft, setChatDraft] = useState('')
   const [isAnnouncement, setIsAnnouncement] = useState(false)
@@ -276,7 +273,7 @@ export default function AdminWebinarStudioPage() {
           </span>
           {isLive ? (
             <Button
-              variant="error"
+              variant="danger"
               size="sm"
               loading={endWebinar.isPending}
               onClick={() => endWebinar.mutate(webinar.id)}
@@ -366,7 +363,7 @@ export default function AdminWebinarStudioPage() {
                 </Button>
               </a>
               <Button
-                variant={chatEnabled ? 'outline' : 'error'}
+                variant={chatEnabled ? 'outline' : 'danger'}
                 size="sm"
                 onClick={() => setChatEnabled((v) => !v)}
               >

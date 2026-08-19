@@ -59,6 +59,8 @@ export default function AdminProfilePage() {
     mutationFn: async () => {
       // Simulate save
       await new Promise((r) => setTimeout(r, 400))
+      void supportEmail
+      void timezone
       return true
     },
     onSuccess: () => {

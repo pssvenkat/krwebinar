@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Badge } from '../../components/ui/Badge'
@@ -367,8 +367,6 @@ function QnAPanel({ userName }: { userName: string }) {
 
 export default function AttendPage() {
   const { token } = useParams<{ token: string }>()
-  const [searchParams] = useSearchParams()
-  const isHostView = searchParams.get('host') === '1'
 
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'poll' | 'qna'>('chat')
   const [viewerCount, setViewerCount] = useState(1)

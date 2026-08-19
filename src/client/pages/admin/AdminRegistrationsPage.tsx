@@ -6,7 +6,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useWebinars } from '../../hooks/useWebinars'
 import { Badge } from '../../components/ui/Badge'
-import { Button } from '../../components/ui/Button'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { getAccessToken } from '../../lib/api'
 

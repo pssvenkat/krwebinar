@@ -43,12 +43,12 @@ const createUserSchema = z.object({
 
 platformUserRoutes.post('/', zValidator('json', createUserSchema), async (c) => {
   const data = c.req.valid('json')
-  const { generateUlid } = await import('../../lib/ulid')
+  const { ulid } = await import('ulid')
   const passwordHash = await hashPassword(data.password)
 
   try {
     const user = await createUser(c.env.DB, {
-      id: generateUlid(),
+      id: ulid(),
       name: data.name,
       email: data.email,
       passwordHash,
