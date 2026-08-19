@@ -87,7 +87,7 @@ app.route('/api/platform', platformRoutes)
 
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)
-app.route('/api/v1/attend', publicWebinarRoutes)
+app.route('/api/v1', publicWebinarRoutes)
 
 // WebSocket routes (tenant-scoped — attendee token or JWT validated inside)
 app.route('/api/v1/ws/webinar', wsRoutes)
