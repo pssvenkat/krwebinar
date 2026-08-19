@@ -1,25 +1,54 @@
 /**
- * WebinarRoom Durable Object — Phase 8 (Full Implementation)
+ * WebinarRoom Durable Object — Real-Time State & Synchronization
  *
  * One instance per active webinar: WEBINAR_ROOM:{tenantId}:{webinarId}
- * Named key must be deterministic so all participants land on the same DO.
+ * Deterministic routing ensures all participants land on the same DO instance.
  *
- * Responsibilities:
- * - Manage WebSocket connections for attendees + host
- * - Track participant presence and count
- * - Broadcast real-time chat messages (rate-limited)
- * - Broadcast ROOM_STATE on join / count change
- * - Broadcast WEBINAR_ENDED when host ends the session
- * - Heartbeat acknowledgement
+ * Capabilities:
+ * - WebSocket connection pooling for Host + Attendees
+ * - Live bidirectional Chat with rate limiting & pinned announcements
+ * - Live Poll creation, real-time voting, and live results broadcast
+ * - Live Q&A question submission, upvoting, live answering & status updates
+ * - Live Host Name updates broadcast to all clients
+ * - Full state sync (ROOM_STATE) delivered on connect
  */
 
-import type {
-  ServerMessage,
-  ParticipantCountMessage,
-  RoomStateMessage,
-  ChatMessage,
-  ErrorMessage,
-} from '../shared/types/index'
+export interface ChatEntry {
+  id: string
+  participantId: string
+  participantName: string
+  content: string
+  isHost: boolean
+  isAnnouncement?: boolean
+  timestamp: string
+}
+
+export interface PollOption {
+  id: string
+  text: string
+  votes: number
+}
+
+export interface PollItem {
+  id: string
+  question: string
+  options: PollOption[]
+  totalVotes: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface QuestionItem {
+  id: string
+  author: string
+  authorId: string
+  text: string
+  upvotes: number
+  upvoters?: string[]
+  isAnswered: boolean
+  answerText?: string
+  timestamp: string
+}
 
 interface ParticipantConnection {
   sessionId: string
@@ -31,18 +60,20 @@ interface ParticipantConnection {
   messageWindowStart: number
 }
 
-// Extend server message types with Phase 8 additions
-type Phase8Message =
-  | ServerMessage
-  | { type: 'WEBINAR_ENDED'; timestamp: string }
-
 export class WebinarRoom implements DurableObject {
   private connections: Map<string, ParticipantConnection> = new Map()
   private tenantId: string = ''
   private webinarId: string = ''
+  private hostName: string = 'Host'
   private chatEnabled: boolean = true
   private qaEnabled: boolean = true
   private isEnded: boolean = false
+  private pinnedAnnouncement: string | null = null
+
+  // In-memory real-time state buffers
+  private chatHistory: ChatEntry[] = []
+  private polls: PollItem[] = []
+  private questions: QuestionItem[] = []
 
   constructor(
     private readonly state: DurableObjectState,
@@ -53,17 +84,14 @@ export class WebinarRoom implements DurableObject {
     const url = new URL(request.url)
     const upgradeHeader = request.headers.get('Upgrade')
 
-    // WebSocket upgrade — both attendees and host
     if (upgradeHeader?.toLowerCase() === 'websocket') {
       return this.handleWebSocketUpgrade(request, url)
     }
 
-    // HTTP: current state (viewer count, flags)
     if (url.pathname.endsWith('/state')) {
       return this.handleStateRequest()
     }
 
-    // HTTP: host broadcasts a system announcement
     if (url.pathname.endsWith('/announce') && request.method === 'POST') {
       return this.handleAnnouncement(request)
     }
@@ -86,6 +114,10 @@ export class WebinarRoom implements DurableObject {
     const isHost = urlParams.get('isHost') === '1'
     this.tenantId = urlParams.get('tenantId') ?? this.tenantId
     this.webinarId = urlParams.get('webinarId') ?? this.webinarId
+    const initialHostName = urlParams.get('hostName')
+    if (initialHostName && (!this.hostName || this.hostName === 'Host')) {
+      this.hostName = initialHostName
+    }
 
     this.state.acceptWebSocket(server, [sessionId])
 
@@ -101,36 +133,149 @@ export class WebinarRoom implements DurableObject {
 
     this.connections.set(sessionId, connection)
 
-    // Send current room state immediately on join
+    // Send complete current room snapshot to the connecting client
     this.sendTo(server, this.buildRoomState())
     this.broadcastParticipantCount()
 
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  // ── Incoming messages ─────────────────────────────────────────────
+  // ── Incoming message routing ──────────────────────────────────────
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== 'string') return
 
-    let data: { type: string; sessionId: string; content?: string }
+    let data: any
     try {
-      data = JSON.parse(message) as { type: string; sessionId: string; content?: string }
+      data = JSON.parse(message)
     } catch {
       return
     }
 
-    const connection = this.connections.get(data.sessionId)
+    // Try finding connection by sessionId or matching socket
+    let connection = this.connections.get(data.sessionId)
+    if (!connection) {
+      for (const conn of this.connections.values()) {
+        if (conn.socket === ws) {
+          connection = conn
+          break
+        }
+      }
+    }
     if (!connection) return
 
     switch (data.type) {
       case 'HEARTBEAT':
-        // Acknowledge — keep connection alive
-        this.sendTo(ws, { type: 'HEARTBEAT_ACK', timestamp: new Date().toISOString() } as unknown as ServerMessage)
+        this.sendTo(ws, { type: 'HEARTBEAT_ACK', timestamp: new Date().toISOString() })
         break
 
+      // Chat messages
+      case 'CHAT_MESSAGE':
       case 'CHAT_SEND':
-        await this.handleChatMessage(connection, data.content ?? '')
+        await this.handleChatMessage(connection, data.content ?? '', !!data.isAnnouncement)
+        break
+
+      case 'ANNOUNCEMENT_PIN':
+        this.pinnedAnnouncement = data.content ?? null
+        this.broadcast({
+          type: 'ANNOUNCEMENT_PINNED',
+          content: this.pinnedAnnouncement,
+          timestamp: new Date().toISOString(),
+        })
+        break
+
+      case 'ANNOUNCEMENT_CLEAR':
+        this.pinnedAnnouncement = null
+        this.broadcast({
+          type: 'ANNOUNCEMENT_CLEARED',
+          timestamp: new Date().toISOString(),
+        })
+        break
+
+      case 'CHAT_TOGGLE':
+        if (connection.isHost && typeof data.enabled === 'boolean') {
+          this.chatEnabled = data.enabled
+          this.broadcast({
+            type: 'CHAT_TOGGLED',
+            enabled: this.chatEnabled,
+            timestamp: new Date().toISOString(),
+          })
+        }
+        break
+
+      // Polls
+      case 'POLL_CREATE':
+      case 'POLL_START':
+        if (connection.isHost && data.poll) {
+          this.handlePollCreate(data.poll)
+        }
+        break
+
+      case 'POLL_VOTE':
+        if (data.pollId && data.optionId) {
+          this.handlePollVote(data.pollId, data.optionId)
+        }
+        break
+
+      case 'POLL_END':
+        if (connection.isHost && data.pollId) {
+          this.handlePollEnd(data.pollId)
+        }
+        break
+
+      case 'POLL_DELETE':
+        if (connection.isHost && data.pollId) {
+          this.polls = this.polls.filter((p) => p.id !== data.pollId)
+          this.broadcast({
+            type: 'POLL_DELETED',
+            pollId: data.pollId,
+            timestamp: new Date().toISOString(),
+          })
+        }
+        break
+
+      // Q&A
+      case 'QUESTION_CREATE':
+      case 'QUESTION_ASK':
+        if (data.text) {
+          this.handleQuestionCreate(connection, data.text, data.author)
+        }
+        break
+
+      case 'QUESTION_VOTE':
+      case 'QUESTION_UPVOTE':
+        if (data.questionId) {
+          this.handleQuestionVote(connection, data.questionId)
+        }
+        break
+
+      case 'QUESTION_ANSWER':
+        if (connection.isHost && data.questionId) {
+          this.handleQuestionAnswer(data.questionId, data.answerText)
+        }
+        break
+
+      case 'QUESTION_DELETE':
+        if (connection.isHost && data.questionId) {
+          this.questions = this.questions.filter((q) => q.id !== data.questionId)
+          this.broadcast({
+            type: 'QUESTION_DELETED',
+            questionId: data.questionId,
+            timestamp: new Date().toISOString(),
+          })
+        }
+        break
+
+      // Host Name Update
+      case 'HOST_NAME_UPDATE':
+        if (connection.isHost && data.hostName) {
+          this.hostName = data.hostName.trim()
+          this.broadcast({
+            type: 'HOST_NAME_UPDATED',
+            hostName: this.hostName,
+            timestamp: new Date().toISOString(),
+          })
+        }
         break
 
       case 'END_WEBINAR':
@@ -149,8 +294,15 @@ export class WebinarRoom implements DurableObject {
     const sessionId = tags[0]
     if (sessionId) {
       this.connections.delete(sessionId)
-      if (!this.isEnded) this.broadcastParticipantCount()
+    } else {
+      for (const [sId, conn] of this.connections.entries()) {
+        if (conn.socket === ws) {
+          this.connections.delete(sId)
+          break
+        }
+      }
     }
+    if (!this.isEnded) this.broadcastParticipantCount()
   }
 
   async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
@@ -158,62 +310,198 @@ export class WebinarRoom implements DurableObject {
     const sessionId = tags[0]
     if (sessionId) {
       this.connections.delete(sessionId)
-      if (!this.isEnded) this.broadcastParticipantCount()
     }
+    if (!this.isEnded) this.broadcastParticipantCount()
   }
 
-  // ── Message handlers ──────────────────────────────────────────────
+  // ── Handler Implementations ───────────────────────────────────────
 
-  private async handleChatMessage(connection: ParticipantConnection, content: string): Promise<void> {
-    if (!this.chatEnabled) return
+  private async handleChatMessage(
+    connection: ParticipantConnection,
+    content: string,
+    isAnnouncement: boolean,
+  ): Promise<void> {
+    if (!this.chatEnabled && !connection.isHost) return
+    const text = content.trim().slice(0, 1000)
+    if (!text) return
 
-    // Rate limiting: max 5 messages per 10 seconds per participant
-    const now = Date.now()
-    if (now - connection.messageWindowStart > 10_000) {
-      connection.messageCount = 0
-      connection.messageWindowStart = now
-    }
-
-    if (connection.messageCount >= 5) {
-      const errorMsg: ErrorMessage = {
-        type: 'ERROR',
-        code: 'RATE_LIMITED',
-        message: 'Sending too quickly — please wait a moment.',
-        timestamp: new Date().toISOString(),
+    // Rate limiting: 10 messages per 10 seconds per non-host participant
+    if (!connection.isHost) {
+      const now = Date.now()
+      if (now - connection.messageWindowStart > 10_000) {
+        connection.messageCount = 0
+        connection.messageWindowStart = now
       }
-      this.sendTo(connection.socket, errorMsg)
-      return
+      if (connection.messageCount >= 10) {
+        this.sendTo(connection.socket, {
+          type: 'ERROR',
+          code: 'RATE_LIMITED',
+          message: 'Sending too quickly — please wait a moment.',
+          timestamp: new Date().toISOString(),
+        })
+        return
+      }
+      connection.messageCount++
     }
 
-    connection.messageCount++
-
-    const chatMsg: ChatMessage = {
-      type: 'CHAT_MESSAGE',
-      id: crypto.randomUUID(),
+    const chatMsg: ChatEntry = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       participantId: connection.sessionId,
-      participantName: connection.isHost ? `${connection.name} (Host)` : connection.name,
-      content: content.slice(0, 500),
+      participantName: connection.isHost ? `${this.hostName || connection.name} (Host)` : connection.name,
+      content: text,
+      isHost: connection.isHost,
+      isAnnouncement: isAnnouncement && connection.isHost,
       timestamp: new Date().toISOString(),
     }
 
-    this.broadcast(chatMsg)
+    this.chatHistory.push(chatMsg)
+    if (this.chatHistory.length > 200) {
+      this.chatHistory.shift()
+    }
+
+    this.broadcast({
+      type: 'CHAT_MESSAGE',
+      ...chatMsg,
+    })
+  }
+
+  private handlePollCreate(pollData: { question: string; options: string[] | { id: string; text: string }[] }): void {
+    const rawOptions = pollData.options || []
+    const options: PollOption[] = rawOptions.map((opt, idx) => {
+      if (typeof opt === 'string') {
+        return { id: String(idx + 1), text: opt, votes: 0 }
+      }
+      return { id: opt.id || String(idx + 1), text: opt.text, votes: 0 }
+    })
+
+    const newPoll: PollItem = {
+      id: `poll-${Date.now()}`,
+      question: pollData.question,
+      options,
+      totalVotes: 0,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    }
+
+    this.polls.unshift(newPoll)
+    this.broadcast({
+      type: 'POLL_STARTED',
+      poll: newPoll,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  private handlePollVote(pollId: string, optionId: string): void {
+    const poll = this.polls.find((p) => p.id === pollId)
+    if (!poll || !poll.isActive) return
+
+    const option = poll.options.find((o) => o.id === optionId)
+    if (option) {
+      option.votes++
+      poll.totalVotes++
+      this.broadcast({
+        type: 'POLL_UPDATED',
+        poll,
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }
+
+  private handlePollEnd(pollId: string): void {
+    const poll = this.polls.find((p) => p.id === pollId)
+    if (!poll) return
+
+    poll.isActive = false
+    this.broadcast({
+      type: 'POLL_ENDED',
+      pollId,
+      poll,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  private handleQuestionCreate(connection: ParticipantConnection, text: string, customAuthor?: string): void {
+    const cleanText = text.trim().slice(0, 500)
+    if (!cleanText) return
+
+    const newQuestion: QuestionItem = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      author: customAuthor || connection.name || 'Anonymous',
+      authorId: connection.sessionId,
+      text: cleanText,
+      upvotes: 1,
+      upvoters: [connection.sessionId],
+      isAnswered: false,
+      timestamp: new Date().toISOString(),
+    }
+
+    this.questions.unshift(newQuestion)
+    this.broadcast({
+      type: 'QUESTION_CREATED',
+      question: newQuestion,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  private handleQuestionVote(connection: ParticipantConnection, questionId: string): void {
+    const question = this.questions.find((q) => q.id === questionId)
+    if (!question) return
+
+    question.upvoters = question.upvoters || []
+    const hasUpvoted = question.upvoters.includes(connection.sessionId)
+
+    if (hasUpvoted) {
+      question.upvoters = question.upvoters.filter((id) => id !== connection.sessionId)
+      question.upvotes = Math.max(0, question.upvotes - 1)
+    } else {
+      question.upvoters.push(connection.sessionId)
+      question.upvotes++
+    }
+
+    this.broadcast({
+      type: 'QUESTION_UPDATED',
+      question,
+      questionId: question.id,
+      upvotes: question.upvotes,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  private handleQuestionAnswer(questionId: string, answerText?: string): void {
+    const question = this.questions.find((q) => q.id === questionId)
+    if (!question) return
+
+    question.isAnswered = true
+    if (answerText) {
+      question.answerText = answerText
+    }
+
+    this.broadcast({
+      type: 'QUESTION_UPDATED',
+      question,
+      questionId: question.id,
+      isAnswered: true,
+      answerText: question.answerText,
+      timestamp: new Date().toISOString(),
+    })
   }
 
   private async handleEndWebinar(): Promise<void> {
     this.isEnded = true
-    const endedMsg: Phase8Message = {
+    this.broadcast({
       type: 'WEBINAR_ENDED',
       timestamp: new Date().toISOString(),
-    }
-    this.broadcastRaw(endedMsg)
+    })
   }
 
   private async handleAnnouncement(request: Request): Promise<Response> {
-    const body = await request.json() as { content: string }
+    const body = (await request.json()) as { content: string }
+    const content = (body.content ?? '').slice(0, 500)
+    this.pinnedAnnouncement = content || null
     this.broadcast({
       type: 'ANNOUNCEMENT',
       id: crypto.randomUUID(),
-      content: (body.content ?? '').slice(0, 500),
+      content,
       timestamp: new Date().toISOString(),
     })
     return Response.json({ ok: true })
@@ -221,32 +509,21 @@ export class WebinarRoom implements DurableObject {
 
   // ── Broadcast helpers ─────────────────────────────────────────────
 
-  private sendTo(ws: WebSocket, message: ServerMessage | Phase8Message): void {
+  private sendTo(ws: WebSocket, message: object): void {
     try {
       ws.send(JSON.stringify(message))
     } catch {
-      // Connection may have closed
+      // Connection closed
     }
   }
 
-  private broadcast(message: ServerMessage): void {
+  private broadcast(message: object): void {
     const payload = JSON.stringify(message)
     for (const conn of this.connections.values()) {
       try {
         conn.socket.send(payload)
       } catch {
-        // Connection may have closed — cleaned up on webSocketClose
-      }
-    }
-  }
-
-  private broadcastRaw(message: Phase8Message): void {
-    const payload = JSON.stringify(message)
-    for (const conn of this.connections.values()) {
-      try {
-        conn.socket.send(payload)
-      } catch {
-        // ignore
+        // Ignored, cleaned up on close
       }
     }
   }
@@ -272,21 +549,24 @@ export class WebinarRoom implements DurableObject {
   }
 
   private sendParticipantCount(): void {
-    const msg: ParticipantCountMessage = {
+    this.broadcast({
       type: 'PARTICIPANT_COUNT',
       count: this.connections.size,
       timestamp: new Date().toISOString(),
-    }
-    this.broadcast(msg)
+    })
   }
 
-  private buildRoomState(): RoomStateMessage {
+  private buildRoomState(): object {
     return {
       type: 'ROOM_STATE',
       participantCount: this.connections.size,
       chatEnabled: this.chatEnabled,
       qaEnabled: this.qaEnabled,
-      activePollId: null,
+      hostName: this.hostName,
+      pinnedAnnouncement: this.pinnedAnnouncement,
+      chatHistory: this.chatHistory,
+      polls: this.polls,
+      questions: this.questions,
       timestamp: new Date().toISOString(),
     }
   }
@@ -296,9 +576,13 @@ export class WebinarRoom implements DurableObject {
       participantCount: this.connections.size,
       tenantId: this.tenantId,
       webinarId: this.webinarId,
+      hostName: this.hostName,
       chatEnabled: this.chatEnabled,
       qaEnabled: this.qaEnabled,
       isEnded: this.isEnded,
+      pinnedAnnouncement: this.pinnedAnnouncement,
+      pollsCount: this.polls.length,
+      questionsCount: this.questions.length,
     })
   }
 }

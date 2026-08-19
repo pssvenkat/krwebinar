@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useWebinar, useEndWebinar, useGoLiveWebinar } from '../../hooks/useWebinars'
+import { useWebSocket } from '../../hooks/useWebSocket'
+import { getAccessToken, api } from '../../lib/api'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { LoadingState, ErrorState } from '../../components/ui/States'
@@ -37,97 +39,232 @@ interface StudioQuestion {
 export default function AdminWebinarStudioPage() {
   const { id } = useParams<{ id: string }>()
 
-  const { data: webinar, isLoading, error } = useWebinar(id)
+  const { data: webinar, isLoading, error, refetch } = useWebinar(id)
   const endWebinar = useEndWebinar()
   const goLive = useGoLiveWebinar()
 
   // Studio tabs & state
   const [activeTab, setActiveTab] = useState<'chat' | 'polls' | 'qna' | 'attendees'>('chat')
-  const [durationSeconds, setDurationSeconds] = useState(742) // 12m 22s initial demo timer
-  const [viewerCount] = useState(18)
+  const [durationSeconds, setDurationSeconds] = useState(0)
+  const [viewerCount, setViewerCount] = useState(1)
   const [chatEnabled, setChatEnabled] = useState(true)
   const [chatDraft, setChatDraft] = useState('')
   const [isAnnouncement, setIsAnnouncement] = useState(false)
-  const [pinnedAnnouncement, setPinnedAnnouncement] = useState<string | null>(
-    '🌿 Welcome to the Urban Microgreens Workshop! Download the cheat sheet from the link below.',
-  )
+  const [pinnedAnnouncement, setPinnedAnnouncement] = useState<string | null>(null)
 
-  // Chat state
-  const [chatMessages, setChatMessages] = useState<StudioChatEntry[]>([
-    {
-      id: 'm1',
-      name: 'Priya Sharma (Host)',
-      text: 'Welcome everyone! Let us know where you are joining from today.',
-      ts: '10:01 AM',
-      isHost: true,
-    },
-    {
-      id: 'm2',
-      name: 'Rohan Mehta',
-      text: 'Joining from Bangalore! Excited for this session.',
-      ts: '10:02 AM',
-      isHost: false,
-    },
-    {
-      id: 'm3',
-      name: 'Sneha Patel',
-      text: 'Hello from Mumbai!',
-      ts: '10:03 AM',
-      isHost: false,
-    },
-  ])
+  // Host Name state & editing
+  const [hostName, setHostName] = useState<string>('')
+  const [isEditingHostName, setIsEditingHostName] = useState(false)
+  const [hostNameDraft, setHostNameDraft] = useState('')
+  const [isSavingHostName, setIsSavingHostName] = useState(false)
 
-  // Polls state
-  const [polls, setPolls] = useState<StudioPoll[]>([
-    {
-      id: 'poll-1',
-      question: 'What is your experience level with growing microgreens?',
-      options: [
-        { id: '1', text: '🌿 Yes, I grow microgreens regularly at home', votes: 8 },
-        { id: '2', text: '🌱 Tried a few times, but want to learn more', votes: 14 },
-        { id: '3', text: '🪴 Complete beginner, eager to start!', votes: 26 },
-      ],
-      totalVotes: 48,
-      isActive: true,
-    },
-  ])
-
-  // New Poll creation state
+  // Chat, Polls, Q&A state
+  const [chatMessages, setChatMessages] = useState<StudioChatEntry[]>([])
+  const [polls, setPolls] = useState<StudioPoll[]>([])
   const [showNewPollModal, setShowNewPollModal] = useState(false)
   const [newPollQuestion, setNewPollQuestion] = useState('')
   const [newPollOptions, setNewPollOptions] = useState(['', ''])
 
-  // Q&A state
-  const [questions, setQuestions] = useState<StudioQuestion[]>([
-    {
-      id: 'q1',
-      author: 'Rahul Verma',
-      text: 'What is the optimal watering frequency for mustard microgreens?',
-      upvotes: 14,
-      isAnswered: true,
-      answerText: 'Mist twice daily in the morning and evening using clean water.',
-      time: '10:14 AM',
-    },
-    {
-      id: 'q2',
-      author: 'Ananya Roy',
-      text: 'Can we reuse the coco-coir potting soil after harvesting the first batch?',
-      upvotes: 19,
-      isAnswered: false,
-      time: '10:22 AM',
-    },
-    {
-      id: 'q3',
-      author: 'Venkatesh S.',
-      text: 'How much direct sunlight do radish microgreens need each day?',
-      upvotes: 7,
-      isAnswered: false,
-      time: '10:28 AM',
-    },
-  ])
-
+  const [questions, setQuestions] = useState<StudioQuestion[]>([])
   const [answeringQuestionId, setAnsweringQuestionId] = useState<string | null>(null)
   const [answerDraft, setAnswerDraft] = useState('')
+
+  // Initialize host name from webinar
+  useEffect(() => {
+    if (webinar?.hostName && !hostName) {
+      setHostName(webinar.hostName)
+      setHostNameDraft(webinar.hostName)
+    }
+  }, [webinar, hostName])
+
+  // WebSocket connection
+  const token = getAccessToken()
+  const wsUrl = id && token ? `/api/v1/ws/webinar/${id}/ws/host?token=${token}` : null
+  const wsAbsoluteUrl = wsUrl
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
+    : null
+
+  const { lastMessage, readyState, sendMessage } = useWebSocket<any>(wsAbsoluteUrl)
+
+  // Handle incoming WebSocket messages from DO
+  useEffect(() => {
+    if (!lastMessage) return
+
+    switch (lastMessage.type) {
+      case 'ROOM_STATE':
+        if (typeof lastMessage.participantCount === 'number') {
+          setViewerCount(lastMessage.participantCount)
+        }
+        if (typeof lastMessage.chatEnabled === 'boolean') {
+          setChatEnabled(lastMessage.chatEnabled)
+        }
+        if (lastMessage.hostName) {
+          setHostName(lastMessage.hostName)
+        }
+        if (lastMessage.pinnedAnnouncement !== undefined) {
+          setPinnedAnnouncement(lastMessage.pinnedAnnouncement)
+        }
+        if (Array.isArray(lastMessage.chatHistory)) {
+          setChatMessages(
+            lastMessage.chatHistory.map((m: any) => ({
+              id: m.id,
+              name: m.participantName || (m.isHost ? 'Host' : 'Participant'),
+              text: m.content,
+              ts: m.timestamp
+                ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '',
+              isHost: !!m.isHost,
+              isPinned: !!m.isAnnouncement,
+            })),
+          )
+        }
+        if (Array.isArray(lastMessage.polls)) {
+          setPolls(lastMessage.polls)
+        }
+        if (Array.isArray(lastMessage.questions)) {
+          setQuestions(
+            lastMessage.questions.map((q: any) => ({
+              id: q.id,
+              author: q.author,
+              text: q.text,
+              upvotes: q.upvotes || 0,
+              isAnswered: !!q.isAnswered,
+              answerText: q.answerText,
+              time: q.timestamp
+                ? new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '',
+            })),
+          )
+        }
+        break
+
+      case 'PARTICIPANT_COUNT':
+        setViewerCount(lastMessage.count ?? 1)
+        break
+
+      case 'CHAT_MESSAGE':
+        if (lastMessage.id && lastMessage.content) {
+          setChatMessages((prev) => {
+            if (prev.some((m) => m.id === lastMessage.id)) return prev
+            return [
+              ...prev.slice(-199),
+              {
+                id: lastMessage.id,
+                name: lastMessage.participantName || (lastMessage.isHost ? 'Host' : 'Participant'),
+                text: lastMessage.content,
+                ts: lastMessage.timestamp
+                  ? new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isHost: !!lastMessage.isHost,
+                isPinned: !!lastMessage.isAnnouncement,
+              },
+            ]
+          })
+        }
+        break
+
+      case 'ANNOUNCEMENT_PINNED':
+        setPinnedAnnouncement(lastMessage.content ?? null)
+        break
+
+      case 'ANNOUNCEMENT_CLEARED':
+        setPinnedAnnouncement(null)
+        break
+
+      case 'CHAT_TOGGLED':
+        if (typeof lastMessage.enabled === 'boolean') {
+          setChatEnabled(lastMessage.enabled)
+        }
+        break
+
+      case 'POLL_STARTED':
+        if (lastMessage.poll) {
+          setPolls((prev) => [lastMessage.poll, ...prev.filter((p) => p.id !== lastMessage.poll.id)])
+        }
+        break
+
+      case 'POLL_UPDATED':
+      case 'POLL_ENDED':
+        if (lastMessage.poll) {
+          setPolls((prev) =>
+            prev.map((p) => (p.id === lastMessage.poll.id ? lastMessage.poll : p)),
+          )
+        }
+        break
+
+      case 'POLL_DELETED':
+        if (lastMessage.pollId) {
+          setPolls((prev) => prev.filter((p) => p.id !== lastMessage.pollId))
+        }
+        break
+
+      case 'QUESTION_CREATED':
+        if (lastMessage.question) {
+          const q = lastMessage.question
+          setQuestions((prev) => [
+            {
+              id: q.id,
+              author: q.author,
+              text: q.text,
+              upvotes: q.upvotes || 1,
+              isAnswered: !!q.isAnswered,
+              answerText: q.answerText,
+              time: q.timestamp
+                ? new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+            ...prev.filter((existing) => existing.id !== q.id),
+          ])
+        }
+        break
+
+      case 'QUESTION_UPDATED':
+        if (lastMessage.question) {
+          const q = lastMessage.question
+          setQuestions((prev) =>
+            prev.map((existing) =>
+              existing.id === q.id
+                ? {
+                    ...existing,
+                    upvotes: typeof q.upvotes === 'number' ? q.upvotes : existing.upvotes,
+                    isAnswered: q.isAnswered !== undefined ? q.isAnswered : existing.isAnswered,
+                    answerText: q.answerText !== undefined ? q.answerText : existing.answerText,
+                  }
+                : existing,
+            ),
+          )
+        } else if (lastMessage.questionId) {
+          setQuestions((prev) =>
+            prev.map((existing) =>
+              existing.id === lastMessage.questionId
+                ? {
+                    ...existing,
+                    upvotes: typeof lastMessage.upvotes === 'number' ? lastMessage.upvotes : existing.upvotes,
+                    isAnswered: lastMessage.isAnswered !== undefined ? lastMessage.isAnswered : existing.isAnswered,
+                    answerText: lastMessage.answerText !== undefined ? lastMessage.answerText : existing.answerText,
+                  }
+                : existing,
+            ),
+          )
+        }
+        break
+
+      case 'QUESTION_DELETED':
+        if (lastMessage.questionId) {
+          setQuestions((prev) => prev.filter((q) => q.id !== lastMessage.questionId))
+        }
+        break
+
+      case 'HOST_NAME_UPDATED':
+        if (lastMessage.hostName) {
+          setHostName(lastMessage.hostName)
+        }
+        break
+
+      default:
+        break
+    }
+  }, [lastMessage])
 
   // Live broadcast duration timer
   useEffect(() => {
@@ -156,28 +293,61 @@ export default function AdminWebinarStudioPage() {
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
+  // Save updated Host Name to DB and broadcast via WS
+  const handleSaveHostName = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!id || !hostNameDraft.trim()) return
+
+    setIsSavingHostName(true)
+    try {
+      const res = await api.webinars.update(id, { hostName: hostNameDraft.trim() })
+      if (res.ok) {
+        setHostName(hostNameDraft.trim())
+        setIsEditingHostName(false)
+        sendMessage({
+          type: 'HOST_NAME_UPDATE',
+          hostName: hostNameDraft.trim(),
+        })
+        refetch()
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsSavingHostName(false)
+    }
+  }
+
   // Host send chat / announcement
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault()
     const text = chatDraft.trim()
     if (!text) return
 
+    sendMessage({
+      type: 'CHAT_MESSAGE',
+      content: text,
+      isAnnouncement,
+    })
+
     if (isAnnouncement) {
-      setPinnedAnnouncement(text)
+      sendMessage({
+        type: 'ANNOUNCEMENT_PIN',
+        content: text,
+      })
     }
 
-    const newMsg: StudioChatEntry = {
-      id: `m-${Date.now()}`,
-      name: `${webinar?.hostName ?? 'Host'} (Host)`,
-      text,
-      ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isHost: true,
-      isPinned: isAnnouncement,
-    }
-
-    setChatMessages((prev) => [...prev, newMsg])
     setChatDraft('')
     setIsAnnouncement(false)
+  }
+
+  // Toggle chat active/muted
+  const handleToggleChat = () => {
+    const nextVal = !chatEnabled
+    setChatEnabled(nextVal)
+    sendMessage({
+      type: 'CHAT_TOGGLE',
+      enabled: nextVal,
+    })
   }
 
   // Create new poll
@@ -186,44 +356,57 @@ export default function AdminWebinarStudioPage() {
     const validOptions = newPollOptions.map((o) => o.trim()).filter(Boolean)
     if (!newPollQuestion.trim() || validOptions.length < 2) return
 
-    const newPoll: StudioPoll = {
-      id: `poll-${Date.now()}`,
-      question: newPollQuestion.trim(),
-      options: validOptions.map((text, idx) => ({ id: String(idx + 1), text, votes: 0 })),
-      totalVotes: 0,
-      isActive: true,
-    }
+    sendMessage({
+      type: 'POLL_CREATE',
+      poll: {
+        question: newPollQuestion.trim(),
+        options: validOptions,
+      },
+    })
 
-    // Set all previous polls inactive
-    setPolls((prev) => [newPoll, ...prev.map((p) => ({ ...p, isActive: false }))])
     setNewPollQuestion('')
     setNewPollOptions(['', ''])
     setShowNewPollModal(false)
     setActiveTab('polls')
   }
 
-  // Toggle active poll
-  const handleTogglePollStatus = (pollId: string) => {
-    setPolls((prev) =>
-      prev.map((p) => (p.id === pollId ? { ...p, isActive: !p.isActive } : p)),
-    )
+  // Toggle active/closed poll
+  const handleTogglePollStatus = (pollId: string, currentActive: boolean) => {
+    if (currentActive) {
+      sendMessage({
+        type: 'POLL_END',
+        pollId,
+      })
+    } else {
+      const p = polls.find((item) => item.id === pollId)
+      if (p) {
+        sendMessage({
+          type: 'POLL_CREATE',
+          poll: {
+            question: p.question,
+            options: p.options.map((opt) => opt.text),
+          },
+        })
+      }
+    }
   }
 
-  // Mark question answered
+  // Mark question answered live
   const handleMarkAnswered = (qId: string) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === qId ? { ...q, isAnswered: true } : q)),
-    )
+    sendMessage({
+      type: 'QUESTION_ANSWER',
+      questionId: qId,
+    })
   }
 
   // Submit written answer
   const handleSubmitAnswer = (qId: string) => {
     if (!answerDraft.trim()) return
-    setQuestions((prev) =>
-      prev.map((q) =>
-        q.id === qId ? { ...q, isAnswered: true, answerText: answerDraft.trim() } : q,
-      ),
-    )
+    sendMessage({
+      type: 'QUESTION_ANSWER',
+      questionId: qId,
+      answerText: answerDraft.trim(),
+    })
     setAnsweringQuestionId(null)
     setAnswerDraft('')
   }
@@ -233,6 +416,7 @@ export default function AdminWebinarStudioPage() {
 
   const videoId = webinar.youtubeVideoId || 'dQw4w9WgXcQ'
   const isLive = webinar.status === 'LIVE'
+  const currentHostDisplayName = hostName || webinar.hostName || 'Host'
 
   return (
     <div className="admin-studio-container" style={{ minHeight: '100vh', background: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
@@ -268,8 +452,8 @@ export default function AdminWebinarStudioPage() {
           <span style={{ fontSize: '0.85rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
             👥 {viewerCount} Live Viewers
           </span>
-          <span style={{ fontSize: '0.85rem', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            ● Stream Healthy (1080p)
+          <span style={{ fontSize: '0.85rem', color: readyState === 'OPEN' ? '#4ade80' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            ● {readyState === 'OPEN' ? 'Live Synced' : 'Connecting WS…'}
           </span>
           {isLive ? (
             <Button
@@ -333,6 +517,84 @@ export default function AdminWebinarStudioPage() {
             </div>
           </div>
 
+          {/* Host Name Edit Bar */}
+          <div
+            style={{
+              background: '#1e293b',
+              borderRadius: '10px',
+              padding: '0.75rem 1rem',
+              border: '1px solid #334155',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 500 }}>Host Display Name:</span>
+              {isEditingHostName ? (
+                <form onSubmit={handleSaveHostName} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, maxWidth: '360px' }}>
+                  <input
+                    type="text"
+                    value={hostNameDraft}
+                    onChange={(e) => setHostNameDraft(e.target.value)}
+                    placeholder="Enter Host Name…"
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: '0.35rem 0.6rem',
+                      background: '#0f172a',
+                      border: '1px solid #38bdf8',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                    }}
+                  />
+                  <Button variant="primary" size="sm" type="submit" loading={isSavingHostName}>
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      setHostNameDraft(currentHostDisplayName)
+                      setIsEditingHostName(false)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#38bdf8' }}>
+                    {currentHostDisplayName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHostNameDraft(currentHostDisplayName)
+                      setIsEditingHostName(true)
+                    }}
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      color: '#38bdf8',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✏️ Edit Host Name
+                  </button>
+                </div>
+              )}
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Broadcasts to attendee screen
+            </span>
+          </div>
+
           {/* Quick Stage Controls Bar */}
           <div
             style={{
@@ -348,7 +610,7 @@ export default function AdminWebinarStudioPage() {
             <div>
               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Attendee Invite Link</p>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
-                Share with attendees: <code style={{ color: '#38bdf8' }}>http://localhost:5173/w/{webinar.id}</code>
+                Share with attendees: <code style={{ color: '#38bdf8' }}>{window.location.origin}/w/{webinar.id}</code>
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -365,7 +627,7 @@ export default function AdminWebinarStudioPage() {
               <Button
                 variant={chatEnabled ? 'outline' : 'danger'}
                 size="sm"
-                onClick={() => setChatEnabled((v) => !v)}
+                onClick={handleToggleChat}
               >
                 {chatEnabled ? '💬 Chat: Enabled' : '🔇 Chat: Muted'}
               </Button>
@@ -393,7 +655,10 @@ export default function AdminWebinarStudioPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setPinnedAnnouncement(null)}
+                onClick={() => {
+                  setPinnedAnnouncement(null)
+                  sendMessage({ type: 'ANNOUNCEMENT_CLEAR' })
+                }}
                 style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem' }}
               >
                 ✕
@@ -472,25 +737,31 @@ export default function AdminWebinarStudioPage() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Messages stream */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {chatMessages.map((m) => (
-                  <div
-                    key={m.id}
-                    style={{
-                      background: m.isHost ? 'rgba(56, 189, 248, 0.1)' : '#0f172a',
-                      border: `1px solid ${m.isHost ? 'rgba(56, 189, 248, 0.3)' : '#334155'}`,
-                      borderRadius: '8px',
-                      padding: '0.6rem 0.75rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.8rem', color: m.isHost ? '#38bdf8' : '#e2e8f0' }}>
-                        {m.name}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{m.ts}</span>
+                {chatMessages.length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', marginTop: '2rem' }}>
+                    No chat messages yet. Broadcast a welcome message below!
+                  </p>
+                ) : (
+                  chatMessages.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        background: m.isHost ? 'rgba(56, 189, 248, 0.1)' : '#0f172a',
+                        border: `1px solid ${m.isHost ? 'rgba(56, 189, 248, 0.3)' : '#334155'}`,
+                        borderRadius: '8px',
+                        padding: '0.6rem 0.75rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.8rem', color: m.isHost ? '#38bdf8' : '#e2e8f0' }}>
+                          {m.name}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{m.ts}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#f1f5f9' }}>{m.text}</p>
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#f1f5f9' }}>{m.text}</p>
-                  </div>
-                ))}
+                  ))
+                )}
                 <div ref={chatBottomRef} />
               </div>
 
@@ -505,7 +776,7 @@ export default function AdminWebinarStudioPage() {
                     />
                     📌 Pin as System Announcement
                   </label>
-                  <span style={{ fontSize: '0.7rem', color: '#38bdf8' }}>Posting as Host</span>
+                  <span style={{ fontSize: '0.7rem', color: '#38bdf8' }}>Posting as {currentHostDisplayName} (Host)</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input
@@ -612,62 +883,68 @@ export default function AdminWebinarStudioPage() {
               )}
 
               {/* Polls List */}
-              {polls.map((poll) => (
-                <div
-                  key={poll.id}
-                  style={{
-                    background: '#0f172a',
-                    border: `1px solid ${poll.isActive ? '#22c55e' : '#334155'}`,
-                    borderRadius: '8px',
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          color: poll.isActive ? '#4ade80' : '#94a3b8',
-                          textTransform: 'uppercase',
-                        }}
+              {polls.length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', marginTop: '2rem' }}>
+                  No active polls. Launch a live poll to engage attendees!
+                </p>
+              ) : (
+                polls.map((poll) => (
+                  <div
+                    key={poll.id}
+                    style={{
+                      background: '#0f172a',
+                      border: `1px solid ${poll.isActive ? '#22c55e' : '#334155'}`,
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            color: poll.isActive ? '#4ade80' : '#94a3b8',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {poll.isActive ? '● LIVE VOTING OPEN' : '○ CLOSED'}
+                        </span>
+                        <h4 style={{ margin: '4px 0 0', fontSize: '0.9rem', color: '#fff' }}>{poll.question}</h4>
+                      </div>
+                      <Button
+                        variant={poll.isActive ? 'secondary' : 'outline'}
+                        size="sm"
+                        onClick={() => handleTogglePollStatus(poll.id, poll.isActive)}
                       >
-                        {poll.isActive ? '● LIVE VOTING OPEN' : '○ CLOSED'}
-                      </span>
-                      <h4 style={{ margin: '4px 0 0', fontSize: '0.9rem', color: '#fff' }}>{poll.question}</h4>
+                        {poll.isActive ? 'Close Poll' : 'Re-open'}
+                      </Button>
                     </div>
-                    <Button
-                      variant={poll.isActive ? 'secondary' : 'outline'}
-                      size="sm"
-                      onClick={() => handleTogglePollStatus(poll.id)}
-                    >
-                      {poll.isActive ? 'Close Poll' : 'Re-open'}
-                    </Button>
-                  </div>
 
-                  {/* Results bars */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {poll.options.map((opt) => {
-                      const pct = Math.round((opt.votes / (poll.totalVotes || 1)) * 100) || 0
-                      return (
-                        <div key={opt.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                            <span style={{ color: '#cbd5e1' }}>{opt.text}</span>
-                            <span style={{ fontWeight: 600, color: '#38bdf8' }}>{opt.votes} ({pct}%)</span>
+                    {/* Results bars */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {poll.options.map((opt) => {
+                        const pct = Math.round((opt.votes / (poll.totalVotes || 1)) * 100) || 0
+                        return (
+                          <div key={opt.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                              <span style={{ color: '#cbd5e1' }}>{opt.text}</span>
+                              <span style={{ fontWeight: 600, color: '#38bdf8' }}>{opt.votes} ({pct}%)</span>
+                            </div>
+                            <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#38bdf8' }} />
+                            </div>
                           </div>
-                          <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct}%`, height: '100%', background: '#38bdf8' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Total Votes Cast: {poll.totalVotes}</span>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Total Votes Cast: {poll.totalVotes}</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
@@ -677,89 +954,95 @@ export default function AdminWebinarStudioPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Attendee Questions</h3>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                  Sorted by upvotes
+                  Real-time sync
                 </span>
               </div>
 
-              {questions.map((q) => (
-                <div
-                  key={q.id}
-                  style={{
-                    background: '#0f172a',
-                    border: `1px solid ${q.isAnswered ? 'rgba(34, 197, 94, 0.4)' : '#334155'}`,
-                    borderRadius: '8px',
-                    padding: '0.75rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: '0.8rem', color: '#38bdf8' }}>{q.author}</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '6px' }}>{q.time}</span>
+              {questions.length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', marginTop: '2rem' }}>
+                  No attendee questions submitted yet.
+                </p>
+              ) : (
+                questions.map((q) => (
+                  <div
+                    key={q.id}
+                    style={{
+                      background: '#0f172a',
+                      border: `1px solid ${q.isAnswered ? 'rgba(34, 197, 94, 0.4)' : '#334155'}`,
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: '0.8rem', color: '#38bdf8' }}>{q.author}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '6px' }}>{q.time}</span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>👍 {q.upvotes}</span>
                     </div>
-                    <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>👍 {q.upvotes}</span>
-                  </div>
 
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#f8fafc' }}>{q.text}</p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#f8fafc' }}>{q.text}</p>
 
-                  {q.answerText && (
-                    <div style={{ background: 'rgba(34, 197, 94, 0.1)', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem', color: '#86efac' }}>
-                      <strong>Host Answer:</strong> {q.answerText}
+                    {q.answerText && (
+                      <div style={{ background: 'rgba(34, 197, 94, 0.1)', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem', color: '#86efac' }}>
+                        <strong>Host Answer:</strong> {q.answerText}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '4px' }}>
+                      {q.isAnswered ? (
+                        <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600 }}>✓ Answered Live</span>
+                      ) : (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleMarkAnswered(q.id)}
+                          >
+                            ✓ Mark Answered
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setAnsweringQuestionId(q.id)
+                              setAnswerDraft('')
+                            }}
+                          >
+                            Type Answer
+                          </Button>
+                        </>
+                      )}
                     </div>
-                  )}
 
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '4px' }}>
-                    {q.isAnswered ? (
-                      <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600 }}>✓ Answered Live</span>
-                    ) : (
-                      <>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleMarkAnswered(q.id)}
-                        >
-                          ✓ Mark Answered
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setAnsweringQuestionId(q.id)
-                            setAnswerDraft('')
+                    {answeringQuestionId === q.id && (
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <input
+                          type="text"
+                          placeholder="Type answer to publish to attendee…"
+                          value={answerDraft}
+                          onChange={(e) => setAnswerDraft(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: '0.4rem 0.5rem',
+                            background: '#1e293b',
+                            border: '1px solid #334155',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '0.8rem',
                           }}
-                        >
-                          Type Answer
+                        />
+                        <Button variant="primary" size="sm" onClick={() => handleSubmitAnswer(q.id)}>
+                          Reply
                         </Button>
-                      </>
+                      </div>
                     )}
                   </div>
-
-                  {answeringQuestionId === q.id && (
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Type answer to publish to attendee…"
-                        value={answerDraft}
-                        onChange={(e) => setAnswerDraft(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: '0.4rem 0.5rem',
-                          background: '#1e293b',
-                          border: '1px solid #334155',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          fontSize: '0.8rem',
-                        }}
-                      />
-                      <Button variant="primary" size="sm" onClick={() => handleSubmitAnswer(q.id)}>
-                        Reply
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>

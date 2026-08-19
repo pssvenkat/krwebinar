@@ -131,8 +131,29 @@ webinarAdminRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
     return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Webinar not found' } }, 404)
   }
 
-  // Cannot edit a LIVE or ENDED webinar
-  if (['LIVE', 'ENDED', 'ARCHIVED'].includes(existing.status)) {
+  // Cannot edit an ENDED or ARCHIVED webinar
+  if (['ENDED', 'ARCHIVED'].includes(existing.status)) {
+    return c.json(
+      { ok: false, error: { code: 'STATUS_CONFLICT', message: `Cannot edit a ${existing.status} webinar` } },
+      409,
+    )
+  }
+
+  const updated = await updateWebinar(c.env.DB, tenant.id, c.req.param('id'), c.req.valid('json'))
+  return c.json({ ok: true, data: { webinar: serializeWebinar(updated!) } })
+})
+
+// ── PATCH /webinars/:id ───────────────────────────────────────────
+
+webinarAdminRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
+  const tenant = c.get('tenant')
+  const existing = await getWebinarById(c.env.DB, tenant.id, c.req.param('id'))
+
+  if (!existing) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Webinar not found' } }, 404)
+  }
+
+  if (['ENDED', 'ARCHIVED'].includes(existing.status)) {
     return c.json(
       { ok: false, error: { code: 'STATUS_CONFLICT', message: `Cannot edit a ${existing.status} webinar` } },
       409,

@@ -18,7 +18,7 @@ vi.mock('@hono/zod-validator', () => ({
 }))
 
 vi.mock('../../middleware/auth', () => ({
-  requireAuth: vi.fn(async (_c: unknown, next: () => Promise<void>) => next()),
+  requireAuth: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
 // ── Mock DB helpers ───────────────────────────────────────────────

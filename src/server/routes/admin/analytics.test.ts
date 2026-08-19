@@ -20,7 +20,7 @@ vi.mock('../../lib/db', () => ({
 }))
 
 vi.mock('../../middleware/auth', () => ({
-  requireAuth: vi.fn(async (_c: unknown, next: () => Promise<void>) => next()),
+  requireAuth: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
 // ── Fixtures ──────────────────────────────────────────────────────

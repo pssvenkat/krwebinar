@@ -42,13 +42,13 @@ app.get('/:id/ws', async (c) => {
     return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } }, 401)
   }
 
-  // Ensure webinar exists + is LIVE
+  // Ensure webinar exists + is PUBLISHED or LIVE
   const webinar = await getWebinarById(c.env.DB, webinarId, tenant.id)
   if (!webinar) {
     return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Webinar not found' } }, 404)
   }
-  if (webinar.status !== 'LIVE') {
-    return c.json({ ok: false, error: { code: 'NOT_LIVE', message: 'Webinar is not live yet' } }, 409)
+  if (!['PUBLISHED', 'LIVE'].includes(webinar.status)) {
+    return c.json({ ok: false, error: { code: 'NOT_LIVE', message: 'Webinar is not live or published' } }, 409)
   }
 
   // Proxy to Durable Object
@@ -58,6 +58,7 @@ app.get('/:id/ws', async (c) => {
     name: registration.name,
     tenantId: tenant.id,
     webinarId,
+    hostName: webinar.host_name || 'Host',
     isHost: '0',
   })
 
@@ -76,15 +77,22 @@ app.get('/:id/ws/host', async (c) => {
   const webinarId = c.req.param('id')
   const tenant = c.get('tenant')
 
-  // Validate Bearer JWT
+  // Validate Bearer JWT from header or query param (for browser WebSocket)
   const authHeader = c.req.header('Authorization') ?? ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
   if (!token) {
-    return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Bearer token required' } }, 401)
+    token = c.req.query('token') ?? null
+  }
+
+  if (!token) {
+    return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Access token required' } }, 401)
   }
 
   const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null)
-  if (!payload || payload.tenantId !== tenant.id) {
+  if (
+    !payload ||
+    (payload.tenantId && payload.role !== 'PLATFORM_OWNER' && payload.tenantId !== tenant.id)
+  ) {
     return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, 401)
   }
 
@@ -95,11 +103,13 @@ app.get('/:id/ws/host', async (c) => {
   }
 
   const stub = getDoStub(c.env, tenant.id, webinarId)
+  const hostDisplayName = webinar.host_name || payload.email.split('@')[0]
   const params = new URLSearchParams({
     sessionId: `host:${payload.sub}`,
-    name: payload.email,
+    name: hostDisplayName,
     tenantId: tenant.id,
     webinarId,
+    hostName: hostDisplayName,
     isHost: '1',
   })
 

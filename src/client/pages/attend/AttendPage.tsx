@@ -27,26 +27,13 @@ interface AttendData {
   }
 }
 
-interface WsMessage {
-  type: string
-  timestamp: string
-  count?: number
-  id?: string
-  participantId?: string
-  participantName?: string
-  content?: string
-  participantCount?: number
-  chatEnabled?: boolean
-  code?: string
-  message?: string
-}
-
 interface ChatEntry {
   id: string
   name: string
   text: string
   ts: string
   isHost: boolean
+  isPinned?: boolean
 }
 
 interface PollOption {
@@ -55,13 +42,23 @@ interface PollOption {
   votes: number
 }
 
+interface PollItem {
+  id: string
+  question: string
+  options: PollOption[]
+  totalVotes: number
+  isActive: boolean
+}
+
 interface QuestionItem {
   id: string
   author: string
+  authorId?: string
   text: string
   upvotes: number
-  hasUpvoted: boolean
+  hasUpvoted?: boolean
   isAnswered: boolean
+  answerText?: string
   time: string
 }
 
@@ -91,11 +88,13 @@ function YouTubeEmbed({ videoId, autoplay = true }: { videoId: string; autoplay?
 
 function ChatPanel({
   messages,
+  pinnedAnnouncement,
   onSend,
   chatEnabled,
   isConnected,
 }: {
   messages: ChatEntry[]
+  pinnedAnnouncement: string | null
   onSend: (text: string) => void
   chatEnabled: boolean
   isConnected: boolean
@@ -111,15 +110,37 @@ function ChatPanel({
     (e: React.FormEvent) => {
       e.preventDefault()
       const text = draft.trim()
-      if (!text || !isConnected) return
+      if (!text || !isConnected || !chatEnabled) return
       onSend(text)
       setDraft('')
     },
-    [draft, isConnected, onSend],
+    [draft, isConnected, chatEnabled, onSend],
   )
 
   return (
     <div className="attend-chat">
+      {/* Pinned announcement banner */}
+      {pinnedAnnouncement && (
+        <div
+          style={{
+            background: 'var(--color-surface)',
+            borderBottom: '2px solid var(--color-primary)',
+            padding: '0.6rem 0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>📌</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+              Host Announcement
+            </span>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text)' }}>{pinnedAnnouncement}</p>
+          </div>
+        </div>
+      )}
+
       <div className="attend-chat-messages" role="log" aria-live="polite" aria-label="Live chat">
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--color-muted)', padding: '2rem 1rem' }}>
@@ -129,13 +150,18 @@ function ChatPanel({
         )}
         {messages.map((m) => (
           <div key={m.id} className={`attend-chat-msg${m.isHost ? ' attend-chat-msg--host' : ''}`}>
-            <span className="attend-chat-name">{m.name}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="attend-chat-name" style={{ color: m.isHost ? 'var(--color-primary)' : undefined }}>
+                {m.name}
+              </span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)' }}>{m.ts}</span>
+            </div>
             <span className="attend-chat-text">{m.text}</span>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
-      {chatEnabled && (
+      {chatEnabled ? (
         <form className="attend-chat-form" onSubmit={submit}>
           <input
             className="attend-chat-input"
@@ -156,6 +182,10 @@ function ChatPanel({
             Send
           </button>
         </form>
+      ) : (
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-muted)', background: 'var(--color-surface)' }}>
+          🔇 Chat has been paused by the host.
+        </div>
       )}
     </div>
   )
@@ -163,45 +193,61 @@ function ChatPanel({
 
 // ── Live Poll Panel ───────────────────────────────────────────────
 
-function PollPanel() {
-  const [votedOption, setVotedOption] = useState<string | null>(null)
-  const [options, setOptions] = useState<PollOption[]>([
-    { id: '1', text: '🌿 Yes, I grow microgreens regularly at home', votes: 14 },
-    { id: '2', text: '🌱 Tried a few times, but want to learn more', votes: 28 },
-    { id: '3', text: '🪴 Complete beginner, eager to start!', votes: 42 },
-  ])
+function PollPanel({
+  polls,
+  onVote,
+}: {
+  polls: PollItem[]
+  onVote: (pollId: string, optionId: string) => void
+}) {
+  const [votedMap, setVotedMap] = useState<Record<string, string>>({})
 
-  const totalVotes = options.reduce((acc, opt) => acc + opt.votes, 0)
+  const activePoll = polls.find((p) => p.isActive) || polls[0]
 
-  const handleVote = (id: string) => {
-    if (votedOption) return
-    setVotedOption(id)
-    setOptions((prev) =>
-      prev.map((opt) => (opt.id === id ? { ...opt, votes: opt.votes + 1 } : opt)),
+  if (!activePoll) {
+    return (
+      <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+        <p style={{ fontSize: '1.5rem', margin: 0 }}>📊</p>
+        <p style={{ fontWeight: 600, marginTop: '0.5rem' }}>No Active Polls</p>
+        <p style={{ fontSize: '0.8rem' }}>When the host launches a poll, it will appear here in real-time.</p>
+      </div>
     )
   }
 
+  const votedOption = votedMap[activePoll.id] || null
+  const totalVotes = activePoll.options.reduce((acc, opt) => acc + opt.votes, 0) || activePoll.totalVotes || 0
+
+  const handleVoteClick = (optId: string) => {
+    if (votedOption || !activePoll.isActive) return
+    setVotedMap((prev) => ({ ...prev, [activePoll.id]: optId }))
+    onVote(activePoll.id, optId)
+  }
+
   return (
-    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }}>
       <div>
-        <Badge variant="primary">Active Poll</Badge>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Badge variant={activePoll.isActive ? 'primary' : 'warning'}>
+            {activePoll.isActive ? 'Active Poll' : 'Poll Closed'}
+          </Badge>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{totalVotes} votes cast</span>
+        </div>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginTop: '0.5rem', color: 'var(--color-text)' }}>
-          What is your experience level with growing microgreens?
+          {activePoll.question}
         </h3>
-        <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{totalVotes} participants voted</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {options.map((opt) => {
-          const pct = Math.round((opt.votes / totalVotes) * 100) || 0
+        {activePoll.options.map((opt) => {
+          const pct = Math.round((opt.votes / (totalVotes || 1)) * 100) || 0
           const isSelected = votedOption === opt.id
 
           return (
             <button
               key={opt.id}
               type="button"
-              onClick={() => handleVote(opt.id)}
-              disabled={votedOption !== null}
+              onClick={() => handleVoteClick(opt.id)}
+              disabled={votedOption !== null || !activePoll.isActive}
               style={{
                 position: 'relative',
                 padding: '0.75rem',
@@ -209,11 +255,11 @@ function PollPanel() {
                 borderRadius: '8px',
                 background: 'var(--color-surface)',
                 textAlign: 'left',
-                cursor: votedOption ? 'default' : 'pointer',
+                cursor: votedOption || !activePoll.isActive ? 'default' : 'pointer',
                 overflow: 'hidden',
               }}
             >
-              {votedOption && (
+              {(votedOption || !activePoll.isActive) && (
                 <div
                   style={{
                     position: 'absolute',
@@ -221,14 +267,15 @@ function PollPanel() {
                     left: 0,
                     bottom: 0,
                     width: `${pct}%`,
-                    background: isSelected ? 'rgba(22, 163, 74, 0.15)' : 'rgba(0,0,0,0.04)',
+                    background: isSelected ? 'rgba(22, 163, 74, 0.2)' : 'rgba(0,0,0,0.05)',
                     zIndex: 0,
+                    transition: 'width 0.3s ease',
                   }}
                 />
               )}
               <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 600 : 400 }}>{opt.text}</span>
-                {votedOption && (
+                {(votedOption || !activePoll.isActive) && (
                   <span style={{ fontWeight: 600, fontSize: '0.85rem', marginLeft: '0.5rem' }}>{pct}%</span>
                 )}
               </div>
@@ -248,56 +295,24 @@ function PollPanel() {
 
 // ── Live Q&A Panel ────────────────────────────────────────────────
 
-function QnAPanel({ userName }: { userName: string }) {
+function QnAPanel({
+  userName,
+  questions,
+  onAsk,
+  onUpvote,
+}: {
+  userName: string
+  questions: QuestionItem[]
+  onAsk: (text: string) => void
+  onUpvote: (questionId: string) => void
+}) {
   const [draftQuestion, setDraftQuestion] = useState('')
-  const [questions, setQuestions] = useState<QuestionItem[]>([
-    {
-      id: 'q1',
-      author: 'Rahul Verma',
-      text: 'What is the optimal watering frequency for mustard microgreens?',
-      upvotes: 8,
-      hasUpvoted: false,
-      isAnswered: true,
-      time: '10:14 AM',
-    },
-    {
-      id: 'q2',
-      author: 'Ananya Roy',
-      text: 'Can we reuse the coco-coir potting soil after harvesting the first batch?',
-      upvotes: 12,
-      hasUpvoted: true,
-      isAnswered: false,
-      time: '10:22 AM',
-    },
-  ])
 
   const handleAsk = (e: React.FormEvent) => {
     e.preventDefault()
     if (!draftQuestion.trim()) return
-    const newQ: QuestionItem = {
-      id: `q-${Date.now()}`,
-      author: userName || 'You',
-      text: draftQuestion.trim(),
-      upvotes: 1,
-      hasUpvoted: true,
-      isAnswered: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
-    setQuestions((prev) => [newQ, ...prev])
+    onAsk(draftQuestion.trim())
     setDraftQuestion('')
-  }
-
-  const toggleUpvote = (id: string) => {
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id !== id) return q
-        return {
-          ...q,
-          upvotes: q.hasUpvoted ? q.upvotes - 1 : q.upvotes + 1,
-          hasUpvoted: !q.hasUpvoted,
-        }
-      }),
-    )
   }
 
   return (
@@ -306,7 +321,7 @@ function QnAPanel({ userName }: { userName: string }) {
         <input
           type="text"
           className="attend-chat-input"
-          placeholder="Ask host a question…"
+          placeholder={`Ask host a question as ${userName || 'Attendee'}…`}
           value={draftQuestion}
           onChange={(e) => setDraftQuestion(e.target.value)}
           maxLength={200}
@@ -317,47 +332,60 @@ function QnAPanel({ userName }: { userName: string }) {
       </form>
 
       <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
-        {questions.map((q) => (
-          <div
-            key={q.id}
-            style={{
-              padding: '0.75rem',
-              borderRadius: '8px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text)' }}>{q.author}</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{q.time}</span>
-            </div>
-            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>{q.text}</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {q.isAnswered ? (
-                <Badge variant="success">Answered Live</Badge>
-              ) : (
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>Pending host reply</span>
-              )}
-              <button
-                type="button"
-                onClick={() => toggleUpvote(q.id)}
-                style={{
-                  background: q.hasUpvoted ? 'rgba(22, 163, 74, 0.1)' : 'transparent',
-                  border: `1px solid ${q.hasUpvoted ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                  borderRadius: '16px',
-                  padding: '2px 8px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                👍 {q.upvotes}
-              </button>
-            </div>
+        {questions.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--color-muted)', padding: '2rem 1rem' }}>
+            <p style={{ fontSize: '1.5rem', margin: 0 }}>❓</p>
+            <p style={{ fontWeight: 600, marginTop: '0.5rem' }}>No questions yet</p>
+            <p style={{ fontSize: '0.8rem' }}>Be the first to ask the host a question!</p>
           </div>
-        ))}
+        ) : (
+          questions.map((q) => (
+            <div
+              key={q.id}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text)' }}>{q.author}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{q.time}</span>
+              </div>
+              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>{q.text}</p>
+              {q.answerText && (
+                <div style={{ background: 'rgba(22, 163, 74, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--color-success)', marginBottom: '0.5rem' }}>
+                  <strong>Host Reply:</strong> {q.answerText}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {q.isAnswered ? (
+                  <Badge variant="success">Answered Live</Badge>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>Pending host reply</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onUpvote(q.id)}
+                  style={{
+                    background: q.hasUpvoted ? 'rgba(22, 163, 74, 0.1)' : 'transparent',
+                    border: `1px solid ${q.hasUpvoted ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                    borderRadius: '16px',
+                    padding: '2px 8px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  👍 {q.upvotes}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -371,15 +399,12 @@ export default function AttendPage() {
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'poll' | 'qna'>('chat')
   const [viewerCount, setViewerCount] = useState(1)
   const [chatEnabled, setChatEnabled] = useState(true)
-  const [chatMessages, setChatMessages] = useState<ChatEntry[]>([
-    {
-      id: 'init-1',
-      name: 'Priya Sharma (Host)',
-      text: 'Welcome everyone to today’s session! We are kicking off in just a moment.',
-      ts: new Date().toISOString(),
-      isHost: true,
-    },
-  ])
+  const [liveHostName, setLiveHostName] = useState<string>('')
+  const [pinnedAnnouncement, setPinnedAnnouncement] = useState<string | null>(null)
+
+  const [chatMessages, setChatMessages] = useState<ChatEntry[]>([])
+  const [polls, setPolls] = useState<PollItem[]>([])
+  const [questions, setQuestions] = useState<QuestionItem[]>([])
 
   // Initial HTTP fetch — validates token, gets webinar state
   const { data, isLoading, error } = useQuery({
@@ -398,47 +423,198 @@ export default function AttendPage() {
   })
 
   // Build WS URL
-  const webinarId = data?.webinar.id ?? '01HZ0000000000000000000005'
-  const registrationId = data?.registration.id ?? '01HZ0000000000000000000010'
+  const webinarId = data?.webinar.id ?? ''
+  const registrationId = data?.registration.id ?? ''
 
-  const wsUrl = `/api/v1/ws/webinar/${webinarId}/ws?token=${token}`
-  const wsAbsoluteUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
+  const wsUrl = webinarId && token ? `/api/v1/ws/webinar/${webinarId}/ws?token=${token}` : null
+  const wsAbsoluteUrl = wsUrl
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsUrl}`
+    : null
 
-  const { lastMessage, readyState, sendMessage } = useWebSocket<WsMessage>(wsAbsoluteUrl)
+  const { lastMessage, readyState, sendMessage } = useWebSocket<any>(wsAbsoluteUrl)
 
   // Handle incoming WS messages
   useEffect(() => {
     if (!lastMessage) return
 
     switch (lastMessage.type) {
+      case 'ROOM_STATE':
+        if (typeof lastMessage.participantCount === 'number') {
+          setViewerCount(lastMessage.participantCount)
+        }
+        if (typeof lastMessage.chatEnabled === 'boolean') {
+          setChatEnabled(lastMessage.chatEnabled)
+        }
+        if (lastMessage.hostName) {
+          setLiveHostName(lastMessage.hostName)
+        }
+        if (lastMessage.pinnedAnnouncement !== undefined) {
+          setPinnedAnnouncement(lastMessage.pinnedAnnouncement)
+        }
+        if (Array.isArray(lastMessage.chatHistory)) {
+          setChatMessages(
+            lastMessage.chatHistory.map((m: any) => ({
+              id: m.id,
+              name: m.participantName || (m.isHost ? 'Host' : 'Participant'),
+              text: m.content,
+              ts: m.timestamp
+                ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '',
+              isHost: !!m.isHost,
+              isPinned: !!m.isAnnouncement,
+            })),
+          )
+        }
+        if (Array.isArray(lastMessage.polls)) {
+          setPolls(lastMessage.polls)
+        }
+        if (Array.isArray(lastMessage.questions)) {
+          setQuestions(
+            lastMessage.questions.map((q: any) => ({
+              id: q.id,
+              author: q.author,
+              text: q.text,
+              upvotes: q.upvotes || 0,
+              isAnswered: !!q.isAnswered,
+              answerText: q.answerText,
+              hasUpvoted: Array.isArray(q.upvoters) ? q.upvoters.includes(registrationId) : false,
+              time: q.timestamp
+                ? new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '',
+            })),
+          )
+        }
+        break
+
       case 'PARTICIPANT_COUNT':
         setViewerCount(lastMessage.count ?? 1)
         break
 
-      case 'ROOM_STATE':
-        setViewerCount(lastMessage.participantCount ?? 1)
-        setChatEnabled(lastMessage.chatEnabled ?? true)
-        break
-
       case 'CHAT_MESSAGE':
         if (lastMessage.id && lastMessage.content) {
-          setChatMessages((prev) => [
-            ...prev.slice(-199),
+          setChatMessages((prev) => {
+            if (prev.some((m) => m.id === lastMessage.id)) return prev
+            return [
+              ...prev.slice(-199),
+              {
+                id: lastMessage.id,
+                name: lastMessage.participantName ?? (lastMessage.isHost ? 'Host' : 'Participant'),
+                text: lastMessage.content,
+                ts: lastMessage.timestamp
+                  ? new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isHost: !!lastMessage.isHost,
+                isPinned: !!lastMessage.isAnnouncement,
+              },
+            ]
+          })
+        }
+        break
+
+      case 'ANNOUNCEMENT_PINNED':
+        setPinnedAnnouncement(lastMessage.content ?? null)
+        break
+
+      case 'ANNOUNCEMENT_CLEARED':
+        setPinnedAnnouncement(null)
+        break
+
+      case 'CHAT_TOGGLED':
+        if (typeof lastMessage.enabled === 'boolean') {
+          setChatEnabled(lastMessage.enabled)
+        }
+        break
+
+      case 'POLL_STARTED':
+        if (lastMessage.poll) {
+          setPolls((prev) => [lastMessage.poll, ...prev.filter((p) => p.id !== lastMessage.poll.id)])
+        }
+        break
+
+      case 'POLL_UPDATED':
+      case 'POLL_ENDED':
+        if (lastMessage.poll) {
+          setPolls((prev) =>
+            prev.map((p) => (p.id === lastMessage.poll.id ? lastMessage.poll : p)),
+          )
+        }
+        break
+
+      case 'POLL_DELETED':
+        if (lastMessage.pollId) {
+          setPolls((prev) => prev.filter((p) => p.id !== lastMessage.pollId))
+        }
+        break
+
+      case 'QUESTION_CREATED':
+        if (lastMessage.question) {
+          const q = lastMessage.question
+          setQuestions((prev) => [
             {
-              id: lastMessage.id!,
-              name: lastMessage.participantName ?? 'Participant',
-              text: lastMessage.content!,
-              ts: lastMessage.timestamp,
-              isHost: (lastMessage.participantName ?? '').includes('(Host)'),
+              id: q.id,
+              author: q.author,
+              text: q.text,
+              upvotes: q.upvotes || 1,
+              isAnswered: !!q.isAnswered,
+              answerText: q.answerText,
+              hasUpvoted: Array.isArray(q.upvoters) ? q.upvoters.includes(registrationId) : false,
+              time: q.timestamp
+                ? new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
+            ...prev.filter((existing) => existing.id !== q.id),
           ])
+        }
+        break
+
+      case 'QUESTION_UPDATED':
+        if (lastMessage.question) {
+          const q = lastMessage.question
+          setQuestions((prev) =>
+            prev.map((existing) =>
+              existing.id === q.id
+                ? {
+                    ...existing,
+                    upvotes: typeof q.upvotes === 'number' ? q.upvotes : existing.upvotes,
+                    isAnswered: q.isAnswered !== undefined ? q.isAnswered : existing.isAnswered,
+                    answerText: q.answerText !== undefined ? q.answerText : existing.answerText,
+                    hasUpvoted: Array.isArray(q.upvoters) ? q.upvoters.includes(registrationId) : existing.hasUpvoted,
+                  }
+                : existing,
+            ),
+          )
+        } else if (lastMessage.questionId) {
+          setQuestions((prev) =>
+            prev.map((existing) =>
+              existing.id === lastMessage.questionId
+                ? {
+                    ...existing,
+                    upvotes: typeof lastMessage.upvotes === 'number' ? lastMessage.upvotes : existing.upvotes,
+                    isAnswered: lastMessage.isAnswered !== undefined ? lastMessage.isAnswered : existing.isAnswered,
+                    answerText: lastMessage.answerText !== undefined ? lastMessage.answerText : existing.answerText,
+                  }
+                : existing,
+            ),
+          )
+        }
+        break
+
+      case 'QUESTION_DELETED':
+        if (lastMessage.questionId) {
+          setQuestions((prev) => prev.filter((q) => q.id !== lastMessage.questionId))
+        }
+        break
+
+      case 'HOST_NAME_UPDATED':
+        if (lastMessage.hostName) {
+          setLiveHostName(lastMessage.hostName)
         }
         break
 
       default:
         break
     }
-  }, [lastMessage])
+  }, [lastMessage, registrationId])
 
   const handleSendMessage = useCallback(
     (text: string) => {
@@ -448,21 +624,50 @@ export default function AttendPage() {
           content: text,
           sessionId: registrationId,
         })
-      } else {
-        // Optimistic local add
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: `msg-${Date.now()}`,
-            name: data?.registration.name ?? 'You',
-            text,
-            ts: new Date().toISOString(),
-            isHost: false,
-          },
-        ])
+      }
+    },
+    [readyState, sendMessage, registrationId],
+  )
+
+  const handleVotePoll = useCallback(
+    (pollId: string, optionId: string) => {
+      if (readyState === 'OPEN') {
+        sendMessage({
+          type: 'POLL_VOTE',
+          pollId,
+          optionId,
+          sessionId: registrationId,
+        })
+      }
+    },
+    [readyState, sendMessage, registrationId],
+  )
+
+  const handleAskQuestion = useCallback(
+    (text: string) => {
+      if (readyState === 'OPEN') {
+        sendMessage({
+          type: 'QUESTION_CREATE',
+          text,
+          author: data?.registration.name || 'Attendee',
+          sessionId: registrationId,
+        })
       }
     },
     [readyState, sendMessage, registrationId, data?.registration.name],
+  )
+
+  const handleUpvoteQuestion = useCallback(
+    (questionId: string) => {
+      if (readyState === 'OPEN') {
+        sendMessage({
+          type: 'QUESTION_VOTE',
+          questionId,
+          sessionId: registrationId,
+        })
+      }
+    },
+    [readyState, sendMessage, registrationId],
   )
 
   if (isLoading) return <LoadingState label="Connecting to webinar room…" />
@@ -483,11 +688,12 @@ export default function AttendPage() {
 
   const registration = data?.registration ?? { name: 'Demo Attendee', email: 'attendee@example.com' }
   const webinar = data?.webinar ?? {
-    title: 'Introduction to Urban Microgreens',
-    hostName: 'Priya Sharma',
+    title: 'Webinar',
+    hostName: 'Host',
     youtubeVideoId: 'dQw4w9WgXcQ',
   }
 
+  const displayHostName = liveHostName || webinar.hostName || 'Host'
   const videoId = webinar.youtubeVideoId || 'dQw4w9WgXcQ'
 
   return (
@@ -523,7 +729,7 @@ export default function AttendPage() {
             <YouTubeEmbed videoId={videoId} autoplay />
             <div className="attend-stream-meta">
               <h1 className="attend-stream-title">{webinar.title}</h1>
-              <p className="attend-stream-host">Hosted by {webinar.hostName}</p>
+              <p className="attend-stream-host">Hosted by {displayHostName}</p>
             </div>
           </div>
 
@@ -542,7 +748,7 @@ export default function AttendPage() {
                 style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
                 onClick={() => setActiveSideTab('chat')}
               >
-                💬 Chat
+                💬 Chat ({chatMessages.length})
               </button>
               <button
                 type="button"
@@ -550,7 +756,7 @@ export default function AttendPage() {
                 style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
                 onClick={() => setActiveSideTab('poll')}
               >
-                📊 Polls
+                📊 Polls {polls.some((p) => p.isActive) ? '●' : ''}
               </button>
               <button
                 type="button"
@@ -558,7 +764,7 @@ export default function AttendPage() {
                 style={{ flex: 1, padding: '0.6rem 0.5rem', fontSize: '0.85rem' }}
                 onClick={() => setActiveSideTab('qna')}
               >
-                ❓ Q&A
+                ❓ Q&A ({questions.length})
               </button>
             </div>
 
@@ -566,13 +772,23 @@ export default function AttendPage() {
               {activeSideTab === 'chat' && (
                 <ChatPanel
                   messages={chatMessages}
+                  pinnedAnnouncement={pinnedAnnouncement}
                   onSend={handleSendMessage}
                   chatEnabled={chatEnabled}
-                  isConnected={readyState === 'OPEN' || true}
+                  isConnected={readyState === 'OPEN'}
                 />
               )}
-              {activeSideTab === 'poll' && <PollPanel />}
-              {activeSideTab === 'qna' && <QnAPanel userName={registration.name} />}
+              {activeSideTab === 'poll' && (
+                <PollPanel polls={polls} onVote={handleVotePoll} />
+              )}
+              {activeSideTab === 'qna' && (
+                <QnAPanel
+                  userName={registration.name}
+                  questions={questions}
+                  onAsk={handleAskQuestion}
+                  onUpvote={handleUpvoteQuestion}
+                />
+              )}
             </div>
           </div>
         </div>
