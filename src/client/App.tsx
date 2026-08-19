@@ -25,11 +25,14 @@ const AdminWebinarDetailPage     = lazy(() => import('./pages/admin/AdminWebinar
 // Phase 9: Analytics pages (lazy-loaded)
 const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyticsPage'))
 const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
+// Phase 10: Branding page (lazy-loaded)
+const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
 
 // Dev pages
 import DesignSystemPage from './pages/dev/DesignSystemPage'
 
 import { LoadingState } from './components/ui/States'
+import { useBranding } from './hooks/useBranding'
 
 function PageFallback() {
   return (
@@ -40,6 +43,9 @@ function PageFallback() {
 }
 
 export default function App() {
+  // Phase 10: Apply tenant branding CSS variables globally
+  useBranding()
+
   return (
     <BrowserRouter>
       <Suspense fallback={<PageFallback />}>
@@ -71,6 +77,7 @@ export default function App() {
             <Route path="webinars/:id/edit" element={<AdminWebinarFormPage />} />
             <Route path="webinars/:id/analytics" element={<AdminWebinarAnalyticsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="branding" element={<AdminBrandingPage />} />
           </Route>
 
           {/* ── Dev routes ── */}

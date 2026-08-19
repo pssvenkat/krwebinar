@@ -716,3 +716,210 @@ export async function getRegistrationsCsvRows(
     }>()
   return result.results
 }
+
+// ── Phase 10: Branding + Settings helpers ─────────────────────────
+
+/** Default colour palette — matches design system CSS variables */
+export const DEFAULT_BRANDING = {
+  primary_color: '#4f46e5',
+  secondary_color: '#7c3aed',
+  accent_color: '#06b6d4',
+  background_color: '#f9fafb',
+  surface_color: '#ffffff',
+  text_color: '#111827',
+  muted_color: '#6b7280',
+  border_color: '#e5e7eb',
+  success_color: '#16a34a',
+  warning_color: '#d97706',
+  error_color: '#dc2626',
+  font_heading: 'Inter, system-ui, sans-serif',
+  font_body: 'Inter, system-ui, sans-serif',
+}
+
+export interface BrandingRow {
+  primary_color: string
+  secondary_color: string
+  accent_color: string
+  background_color: string
+  surface_color: string
+  text_color: string
+  muted_color: string
+  border_color: string
+  success_color: string
+  warning_color: string
+  error_color: string
+  font_heading: string
+  font_body: string
+  logo_url: string | null
+  favicon_url: string | null
+  custom_css: string | null
+}
+
+export async function getBranding(db: D1Database, tenantId: string): Promise<BrandingRow> {
+  const row = await db
+    .prepare('SELECT * FROM tenant_branding WHERE tenant_id = ?')
+    .bind(tenantId)
+    .first<BrandingRow & { tenant_id: string }>()
+
+  if (!row) {
+    return {
+      ...DEFAULT_BRANDING,
+      logo_url: null,
+      favicon_url: null,
+      custom_css: null,
+    }
+  }
+
+  return {
+    primary_color: row.primary_color ?? DEFAULT_BRANDING.primary_color,
+    secondary_color: row.secondary_color ?? DEFAULT_BRANDING.secondary_color,
+    accent_color: row.accent_color ?? DEFAULT_BRANDING.accent_color,
+    background_color: row.background_color ?? DEFAULT_BRANDING.background_color,
+    surface_color: row.surface_color ?? DEFAULT_BRANDING.surface_color,
+    text_color: row.text_color ?? DEFAULT_BRANDING.text_color,
+    muted_color: row.muted_color ?? DEFAULT_BRANDING.muted_color,
+    border_color: row.border_color ?? DEFAULT_BRANDING.border_color,
+    success_color: row.success_color ?? DEFAULT_BRANDING.success_color,
+    warning_color: row.warning_color ?? DEFAULT_BRANDING.warning_color,
+    error_color: row.error_color ?? DEFAULT_BRANDING.error_color,
+    font_heading: row.font_heading ?? DEFAULT_BRANDING.font_heading,
+    font_body: row.font_body ?? DEFAULT_BRANDING.font_body,
+    logo_url: row.logo_url ?? null,
+    favicon_url: row.favicon_url ?? null,
+    custom_css: row.custom_css ?? null,
+  }
+}
+
+export async function upsertBranding(
+  db: D1Database,
+  tenantId: string,
+  patch: Partial<BrandingRow>,
+): Promise<void> {
+  const current = await getBranding(db, tenantId)
+  const merged = { ...current, ...patch }
+
+  await db
+    .prepare(
+      `INSERT INTO tenant_branding
+         (id, tenant_id, primary_color, secondary_color, accent_color,
+          background_color, surface_color, text_color, muted_color, border_color,
+          success_color, warning_color, error_color, font_heading, font_body,
+          logo_url, favicon_url, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(tenant_id) DO UPDATE SET
+         primary_color = excluded.primary_color,
+         secondary_color = excluded.secondary_color,
+         accent_color = excluded.accent_color,
+         background_color = excluded.background_color,
+         surface_color = excluded.surface_color,
+         text_color = excluded.text_color,
+         muted_color = excluded.muted_color,
+         border_color = excluded.border_color,
+         success_color = excluded.success_color,
+         warning_color = excluded.warning_color,
+         error_color = excluded.error_color,
+         font_heading = excluded.font_heading,
+         font_body = excluded.font_body,
+         logo_url = excluded.logo_url,
+         favicon_url = excluded.favicon_url,
+         updated_at = datetime('now')`,
+    )
+    .bind(
+      generateULID(), tenantId,
+      merged.primary_color, merged.secondary_color, merged.accent_color,
+      merged.background_color, merged.surface_color, merged.text_color,
+      merged.muted_color, merged.border_color,
+      merged.success_color, merged.warning_color, merged.error_color,
+      merged.font_heading, merged.font_body,
+      merged.logo_url, merged.favicon_url,
+    )
+    .run()
+}
+
+export interface SettingsRow {
+  max_webinars: number
+  max_participants: number
+  chat_rate_limit_messages: number
+  chat_rate_limit_window_seconds: number
+}
+
+export async function getSettings(db: D1Database, tenantId: string): Promise<SettingsRow> {
+  const row = await db
+    .prepare('SELECT * FROM tenant_settings WHERE tenant_id = ?')
+    .bind(tenantId)
+    .first<SettingsRow>()
+
+  return {
+    max_webinars: row?.max_webinars ?? 10,
+    max_participants: row?.max_participants ?? 300,
+    chat_rate_limit_messages: row?.chat_rate_limit_messages ?? 5,
+    chat_rate_limit_window_seconds: row?.chat_rate_limit_window_seconds ?? 10,
+  }
+}
+
+export async function upsertSettings(
+  db: D1Database,
+  tenantId: string,
+  patch: Partial<SettingsRow>,
+): Promise<void> {
+  const current = await getSettings(db, tenantId)
+  const merged = { ...current, ...patch }
+
+  await db
+    .prepare(
+      `INSERT INTO tenant_settings
+         (id, tenant_id, max_webinars, max_participants,
+          chat_rate_limit_messages, chat_rate_limit_window_seconds, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(tenant_id) DO UPDATE SET
+         max_webinars = excluded.max_webinars,
+         max_participants = excluded.max_participants,
+         chat_rate_limit_messages = excluded.chat_rate_limit_messages,
+         chat_rate_limit_window_seconds = excluded.chat_rate_limit_window_seconds,
+         updated_at = datetime('now')`,
+    )
+    .bind(
+      generateULID(), tenantId,
+      merged.max_webinars, merged.max_participants,
+      merged.chat_rate_limit_messages, merged.chat_rate_limit_window_seconds,
+    )
+    .run()
+}
+
+/** Public branding — minimal subset safe to expose without auth */
+export async function getPublicBranding(
+  db: D1Database,
+  tenantId: string,
+): Promise<{
+  primaryColor: string; secondaryColor: string; accentColor: string
+  backgroundColor: string; surfaceColor: string; textColor: string
+  mutedColor: string; borderColor: string; successColor: string
+  warningColor: string; errorColor: string
+  fontHeading: string; fontBody: string
+  logoUrl: string | null; faviconUrl: string | null
+  platformName: string
+}> {
+  const [branding, tenant] = await Promise.all([
+    getBranding(db, tenantId),
+    db.prepare('SELECT name FROM tenants WHERE id = ?').bind(tenantId).first<{ name: string }>(),
+  ])
+
+  return {
+    primaryColor: branding.primary_color,
+    secondaryColor: branding.secondary_color,
+    accentColor: branding.accent_color,
+    backgroundColor: branding.background_color,
+    surfaceColor: branding.surface_color,
+    textColor: branding.text_color,
+    mutedColor: branding.muted_color,
+    borderColor: branding.border_color,
+    successColor: branding.success_color,
+    warningColor: branding.warning_color,
+    errorColor: branding.error_color,
+    fontHeading: branding.font_heading,
+    fontBody: branding.font_body,
+    logoUrl: branding.logo_url,
+    faviconUrl: branding.favicon_url,
+    platformName: tenant?.name ?? 'Webinar Platform',
+  }
+}

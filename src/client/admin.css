@@ -516,3 +516,243 @@ select.input-field:focus {
     display: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 10 — BRANDING + SETTINGS PAGE
+   ═══════════════════════════════════════════════════════════════ */
+
+.admin-branding-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ── Two-column layout ────────────────────────────────────────── */
+
+.branding-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.branding-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Section card ─────────────────────────────────────────────── */
+
+.branding-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.branding-section-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* ── Field group ──────────────────────────────────────────────── */
+
+.branding-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Color grid ───────────────────────────────────────────────── */
+
+.branding-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.branding-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.branding-color-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.branding-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.branding-color-picker {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.branding-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.branding-color-picker::-webkit-color-swatch { border: 1px solid var(--color-border); border-radius: 0.25rem; }
+
+.branding-color-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-family: 'Roboto Mono', monospace;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.branding-color-text:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.branding-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* ── Logo preview ─────────────────────────────────────────────── */
+
+.branding-logo-preview {
+  margin-top: 0.5rem;
+  max-width: 200px;
+  max-height: 80px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.branding-logo-preview img {
+  max-width: 100%;
+  max-height: 64px;
+  object-fit: contain;
+}
+
+/* ── Saved badge ──────────────────────────────────────────────── */
+
+.branding-saved-badge {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #16a34a;
+  padding: 0.375rem 0.75rem;
+  background: #dcfce7;
+  border-radius: 9999px;
+}
+
+/* ── Live preview sidebar ─────────────────────────────────────── */
+
+.branding-preview-col {
+  position: sticky;
+  top: 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.branding-preview-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.branding-preview {
+  border: 1px solid var(--preview-border, var(--color-border));
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--preview-bg, var(--color-background));
+}
+
+.branding-preview-header {
+  padding: 1rem 1.25rem;
+  background: var(--preview-surface, var(--color-surface));
+  border-bottom: 1px solid var(--preview-border, var(--color-border));
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.branding-preview-logo {
+  max-height: 32px;
+  max-width: 120px;
+  object-fit: contain;
+}
+
+.branding-preview-logo-placeholder {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--preview-primary, var(--color-primary));
+}
+
+.branding-preview-body {
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.branding-preview-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.branding-preview-sub {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.branding-preview-btn {
+  align-self: flex-start;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .branding-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .branding-preview-col {
+    position: static;
+  }
+
+  .branding-color-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
