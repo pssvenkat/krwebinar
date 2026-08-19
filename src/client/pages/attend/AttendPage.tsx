@@ -406,6 +406,29 @@ export default function AttendPage() {
   const [polls, setPolls] = useState<PollItem[]>([])
   const [questions, setQuestions] = useState<QuestionItem[]>([])
 
+  // Phone verification state
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(() => {
+    if (!token) return false
+    try {
+      return !!sessionStorage.getItem(`verified_attendee_${token}`)
+    } catch {
+      return false
+    }
+  })
+  const [verifiedRegistration, setVerifiedRegistration] = useState<{ id: string; name: string; email: string; phone?: string } | null>(() => {
+    if (!token) return null
+    try {
+      const stored = sessionStorage.getItem(`verified_attendee_${token}`)
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+  const [phoneInput, setPhoneInput] = useState('')
+  const [countryDialCode, setCountryDialCode] = useState('+91')
+  const [phoneVerifyError, setPhoneVerifyError] = useState<string | null>(null)
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false)
+
   // Initial HTTP fetch — validates token, gets webinar state
   const { data, isLoading, error } = useQuery({
     queryKey: ['attend', token],
@@ -422,9 +445,74 @@ export default function AttendPage() {
     staleTime: 30_000,
   })
 
+  // Check if phone was already validated for this specific webinar ID
+  useEffect(() => {
+    if (data?.webinar.id) {
+      try {
+        const stored = sessionStorage.getItem(`verified_attendee_${data.webinar.id}`)
+        if (stored) {
+          setVerifiedRegistration(JSON.parse(stored))
+          setIsPhoneVerified(true)
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [data?.webinar.id])
+
+  const handleVerifyPhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhoneVerifyError(null)
+    const raw = phoneInput.trim()
+    if (!raw) {
+      setPhoneVerifyError('Please enter your phone number')
+      return
+    }
+
+    const fullPhone = raw.startsWith('+') ? raw : `${countryDialCode}${raw}`
+    setIsVerifyingPhone(true)
+
+    try {
+      const effectiveWebinarId = data?.webinar.id || token || ''
+      const res = await fetch('/api/v1/attend/verify-phone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Slug': 'krave',
+        },
+        body: JSON.stringify({
+          webinarId: effectiveWebinarId,
+          phone: fullPhone,
+        }),
+      })
+
+      const json = (await res.json()) as any
+      if (!json.ok || !json.data) {
+        setPhoneVerifyError(json.error?.message || 'This phone number is not registered for this webinar. Please register first.')
+        return
+      }
+
+      const reg = json.data.registration
+      setVerifiedRegistration(reg)
+      setIsPhoneVerified(true)
+      try {
+        sessionStorage.setItem(`verified_attendee_${effectiveWebinarId}`, JSON.stringify(reg))
+        if (token) {
+          sessionStorage.setItem(`verified_attendee_${token}`, JSON.stringify(reg))
+        }
+      } catch {
+        // ignore
+      }
+    } catch (err: any) {
+      setPhoneVerifyError(err.message || 'Failed to verify phone number')
+    } finally {
+      setIsVerifyingPhone(false)
+    }
+  }
+
   // Build WS URL
   const webinarId = data?.webinar.id ?? ''
-  const registrationId = data?.registration.id ?? ''
+  const registrationId = verifiedRegistration?.id ?? data?.registration.id ?? ''
 
   const wsUrl = webinarId && token ? `/api/v1/ws/webinar/${webinarId}/ws?token=${token}` : null
   const wsAbsoluteUrl = wsUrl
@@ -686,11 +774,165 @@ export default function AttendPage() {
     )
   }
 
-  const registration = data?.registration ?? { name: 'Demo Attendee', email: 'attendee@example.com' }
+  const registration = verifiedRegistration ?? data?.registration ?? { name: 'Attendee', email: 'attendee@example.com' }
   const webinar = data?.webinar ?? {
+    id: token ?? '',
     title: 'Webinar',
     hostName: 'Host',
     youtubeVideoId: 'dQw4w9WgXcQ',
+  }
+
+  const targetWebinarId = webinar.id || token || ''
+
+  if (!isPhoneVerified) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#090d16',
+          padding: '1.5rem',
+          color: '#f8fafc',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '460px',
+            width: '100%',
+            background: '#111827',
+            borderRadius: '16px',
+            padding: '2.25rem',
+            border: '1px solid #1f2937',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🔒</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Attendee Access Verification
+            </span>
+            <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0.5rem 0 0.25rem', color: '#ffffff' }}>
+              {webinar.title}
+            </h1>
+            {webinar.hostName && (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#9ca3af' }}>
+                Hosted by {webinar.hostName}
+              </p>
+            )}
+          </div>
+
+          <form onSubmit={handleVerifyPhone} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+            <div>
+              <label
+                htmlFor="attendee-phone"
+                style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: '#e5e7eb' }}
+              >
+                Registered Mobile Number
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <select
+                  value={countryDialCode}
+                  onChange={(e) => setCountryDialCode(e.target.value)}
+                  style={{
+                    padding: '0.65rem 0.5rem',
+                    background: '#1f2937',
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '0.9rem',
+                    minWidth: '85px',
+                  }}
+                >
+                  <option value="+91">🇮🇳 +91</option>
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+971">🇦🇪 +971</option>
+                  <option value="+65">🇸🇬 +65</option>
+                  <option value="+61">🇦🇺 +61</option>
+                  <option value="+49">🇩🇪 +49</option>
+                  <option value="+33">🇫🇷 +33</option>
+                </select>
+                <input
+                  id="attendee-phone"
+                  type="tel"
+                  placeholder="Enter phone (e.g. 9876543210)"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.65rem 0.85rem',
+                    background: '#1f2937',
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '0.95rem',
+                  }}
+                  autoFocus
+                />
+              </div>
+              <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+                Please enter the phone number you used when registering for this webinar.
+              </p>
+            </div>
+
+            {phoneVerifyError && (
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '0.85rem',
+                  color: '#fca5a5',
+                  fontSize: '0.85rem',
+                }}
+              >
+                <p style={{ margin: 0, fontWeight: 600 }}>⚠️ Verification Failed</p>
+                <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.8rem' }}>{phoneVerifyError}</p>
+                <Link
+                  to={`/register/${targetWebinarId}`}
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.4rem 0.75rem',
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Register for this Webinar →
+                </Link>
+              </div>
+            )}
+
+            <Button
+              id="btn-join-webinar"
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={isVerifyingPhone || !phoneInput.trim()}
+              style={{ width: '100%', marginTop: '0.25rem', padding: '0.75rem' }}
+            >
+              {isVerifyingPhone ? 'Verifying Phone…' : 'Verify & Enter Live Stream →'}
+            </Button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem', textAlign: 'center', borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Haven't registered yet? </span>
+            <Link
+              to={`/register/${targetWebinarId}`}
+              style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'underline' }}
+            >
+              Register now
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const displayHostName = liveHostName || webinar.hostName || 'Host'

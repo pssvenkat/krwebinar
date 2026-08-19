@@ -133,7 +133,7 @@ export class WebinarRoom implements DurableObject {
       }
     }
 
-    this.state.acceptWebSocket(server, [sessionId])
+    this.state.acceptWebSocket(server, [sessionId, isHost ? 'host' : 'participant'])
 
     const connection: ParticipantConnection = {
       sessionId,
@@ -207,6 +207,14 @@ export class WebinarRoom implements DurableObject {
       this.connections.set(sId, connection)
     }
 
+    const tags = typeof (this.state as any).getTags === 'function' ? (this.state as any).getTags(ws) : []
+    const isHostTag = tags.includes('host') || tags.some((t: string) => t.startsWith('host:') || t === 'host')
+    const isHostUser = !!(connection?.isHost || attachment?.isHost || isHostTag || data.isHost === true)
+
+    if (connection && isHostUser && !connection.isHost) {
+      connection.isHost = true
+    }
+
     switch (data.type) {
       case 'JOIN':
       case 'GET_STATE':
@@ -221,28 +229,32 @@ export class WebinarRoom implements DurableObject {
       // Chat messages
       case 'CHAT_MESSAGE':
       case 'CHAT_SEND':
-        await this.handleChatMessage(connection, data.content ?? '', !!data.isAnnouncement)
+        await this.handleChatMessage(connection, data.content ?? '', !!(data.isAnnouncement && isHostUser))
         break
 
       case 'ANNOUNCEMENT_PIN':
-        this.pinnedAnnouncement = data.content ?? null
-        this.broadcast({
-          type: 'ANNOUNCEMENT_PINNED',
-          content: this.pinnedAnnouncement,
-          timestamp: new Date().toISOString(),
-        })
+        if (isHostUser) {
+          this.pinnedAnnouncement = data.content ?? null
+          this.broadcast({
+            type: 'ANNOUNCEMENT_PINNED',
+            content: this.pinnedAnnouncement,
+            timestamp: new Date().toISOString(),
+          })
+        }
         break
 
       case 'ANNOUNCEMENT_CLEAR':
-        this.pinnedAnnouncement = null
-        this.broadcast({
-          type: 'ANNOUNCEMENT_CLEARED',
-          timestamp: new Date().toISOString(),
-        })
+        if (isHostUser) {
+          this.pinnedAnnouncement = null
+          this.broadcast({
+            type: 'ANNOUNCEMENT_CLEARED',
+            timestamp: new Date().toISOString(),
+          })
+        }
         break
 
       case 'CHAT_TOGGLE':
-        if (connection.isHost && typeof data.enabled === 'boolean') {
+        if (isHostUser && typeof data.enabled === 'boolean') {
           this.chatEnabled = data.enabled
           this.broadcast({
             type: 'CHAT_TOGGLED',
@@ -255,7 +267,7 @@ export class WebinarRoom implements DurableObject {
       // Polls
       case 'POLL_CREATE':
       case 'POLL_START':
-        if (connection.isHost && data.poll) {
+        if (isHostUser && data.poll) {
           this.handlePollCreate(data.poll)
         }
         break
@@ -267,13 +279,13 @@ export class WebinarRoom implements DurableObject {
         break
 
       case 'POLL_END':
-        if (connection.isHost && data.pollId) {
+        if (isHostUser && data.pollId) {
           this.handlePollEnd(data.pollId)
         }
         break
 
       case 'POLL_DELETE':
-        if (connection.isHost && data.pollId) {
+        if (isHostUser && data.pollId) {
           this.polls = this.polls.filter((p) => p.id !== data.pollId)
           this.broadcast({
             type: 'POLL_DELETED',
@@ -299,13 +311,13 @@ export class WebinarRoom implements DurableObject {
         break
 
       case 'QUESTION_ANSWER':
-        if (connection.isHost && data.questionId) {
+        if (isHostUser && data.questionId) {
           this.handleQuestionAnswer(data.questionId, data.answerText)
         }
         break
 
       case 'QUESTION_DELETE':
-        if (connection.isHost && data.questionId) {
+        if (isHostUser && data.questionId) {
           this.questions = this.questions.filter((q) => q.id !== data.questionId)
           this.broadcast({
             type: 'QUESTION_DELETED',
@@ -317,7 +329,7 @@ export class WebinarRoom implements DurableObject {
 
       // Host Name Update
       case 'HOST_NAME_UPDATE':
-        if (connection.isHost && data.hostName) {
+        if (isHostUser && data.hostName) {
           this.hostName = data.hostName.trim()
           this.broadcast({
             type: 'HOST_NAME_UPDATED',
@@ -328,7 +340,7 @@ export class WebinarRoom implements DurableObject {
         break
 
       case 'END_WEBINAR':
-        if (connection.isHost) {
+        if (isHostUser) {
           await this.handleEndWebinar()
         }
         break

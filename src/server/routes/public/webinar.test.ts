@@ -61,9 +61,16 @@ const TENANT_CTX: TenantContext = {
   status: 'active',
 }
 
-// Mock env — DB calls are intercepted by vi.mock so {} is fine
+// Mock env — with DB mock support
 const MOCK_ENV = {
-  DB: {} as unknown,
+  DB: {
+    prepare: vi.fn().mockReturnValue({
+      bind: vi.fn().mockReturnValue({
+        first: vi.fn().mockResolvedValue(null),
+        all: vi.fn().mockResolvedValue({ results: [] }),
+      }),
+    }),
+  } as unknown,
   ENVIRONMENT: 'development',
   JWT_SECRET: 'test-secret',
   TURNSTILE_SECRET_KEY: '',
@@ -324,5 +331,96 @@ describe('POST /:id/feedback', () => {
     expect(res.status).toBe(409)
     const body = await res.json() as { error: { code: string } }
     expect(body.error.code).toBe('NOT_ALLOWED')
+  })
+})
+
+describe('POST /attend/verify-phone', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('validates registered phone number successfully', async () => {
+    vi.mocked(getWebinarById).mockResolvedValueOnce(MOCK_WEBINAR)
+    const mockDb = {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          all: vi.fn().mockResolvedValueOnce({
+            results: [
+              {
+                id: 'reg-1',
+                name: 'Verified Attendee',
+                email: 'verified@example.com',
+                phone_e164: '+919876543210',
+                access_token: 'token-abc-123',
+              },
+            ],
+          }),
+        }),
+      }),
+    }
+
+    const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
+    app.use('*', async (c, next) => {
+      c.set('tenant', TENANT_CTX)
+      await next()
+    })
+    app.route('/', publicWebinarRoutes)
+
+    const res = await app.fetch(
+      new Request('http://localhost/attend/verify-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webinarId: 'webinar-1', phone: '9876543210' }),
+      }),
+      { ...MOCK_ENV, DB: mockDb as unknown } as Env,
+      MOCK_CTX,
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean; data: any }
+    expect(body.ok).toBe(true)
+    expect(body.data.accessToken).toBe('token-abc-123')
+    expect(body.data.registration.name).toBe('Verified Attendee')
+  })
+
+  it('rejects unregistered phone number with 403 NOT_REGISTERED', async () => {
+    vi.mocked(getWebinarById).mockResolvedValueOnce(MOCK_WEBINAR)
+    const mockDb = {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          all: vi.fn().mockResolvedValueOnce({
+            results: [
+              {
+                id: 'reg-1',
+                name: 'Other Attendee',
+                email: 'other@example.com',
+                phone_e164: '+919999999999',
+                access_token: 'token-other',
+              },
+            ],
+          }),
+        }),
+      }),
+    }
+
+    const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
+    app.use('*', async (c, next) => {
+      c.set('tenant', TENANT_CTX)
+      await next()
+    })
+    app.route('/', publicWebinarRoutes)
+
+    const res = await app.fetch(
+      new Request('http://localhost/attend/verify-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webinarId: 'webinar-1', phone: '9876543210' }),
+      }),
+      { ...MOCK_ENV, DB: mockDb as unknown } as Env,
+      MOCK_CTX,
+    )
+
+    expect(res.status).toBe(403)
+    const body = await res.json() as { ok: boolean; error: { code: string } }
+    expect(body.ok).toBe(false)
+    expect(body.error.code).toBe('NOT_REGISTERED')
   })
 })

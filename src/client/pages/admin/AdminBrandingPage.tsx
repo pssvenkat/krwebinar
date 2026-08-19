@@ -1,9 +1,190 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Button } from '../../components/ui/Button'
 import { api } from '../../lib/api'
 import type { BrandingData, SettingsData } from '../../lib/api'
+
+// ── File Upload Component ─────────────────────────────────────────
+
+function ImageUploadField({
+  label,
+  description,
+  value,
+  onChange,
+  accept = 'image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon,image/vnd.microsoft.icon',
+  maxSizeMB = 2,
+  previewHeight = 56,
+}: {
+  label: string
+  description?: string
+  value: string | null
+  onChange: (val: string | null) => void
+  accept?: string
+  maxSizeMB?: number
+  previewHeight?: number
+}) {
+  const [dragOver, setDragOver] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const processFile = (file: File) => {
+    setError(null)
+    if (!file) return
+
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setError(`File size exceeds ${maxSizeMB}MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      onChange(result)
+    }
+    reader.onerror = () => {
+      setError('Failed to read image file')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0])
+    }
+  }
+
+  return (
+    <div className="branding-field-group" style={{ marginBottom: '1.25rem' }}>
+      <label className="input-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+        {label}
+      </label>
+      {description && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted, #94a3b8)', marginTop: 0, marginBottom: '0.5rem' }}>
+          {description}
+        </p>
+      )}
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        style={{
+          border: `2px dashed ${dragOver ? 'var(--color-primary, #16a34a)' : 'var(--color-border, #cbd5e1)'}`,
+          background: dragOver ? 'rgba(22, 163, 74, 0.05)' : 'var(--color-surface, #f8fafc)',
+          borderRadius: '8px',
+          padding: '1rem',
+          textAlign: 'center',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.75rem',
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              processFile(e.target.files[0])
+            }
+          }}
+        />
+
+        {value ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', justifyContent: 'space-between', padding: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div
+                style={{
+                  height: previewHeight,
+                  maxHeight: previewHeight,
+                  minWidth: previewHeight,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={value}
+                  alt={`${label} preview`}
+                  style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1e293b)', display: 'block' }}>
+                  Image Selected
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-muted, #64748b)' }}>
+                  Click Save Changes to apply
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+              >
+                Change
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onChange(null)
+                  if (inputRef.current) inputRef.current.value = ''
+                }}
+                style={{ color: '#ef4444' }}
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ fontSize: '1.75rem' }}>📁</div>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text, #334155)' }}>
+              Drag and drop an image here, or
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+            >
+              Browse Image File
+            </Button>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-muted, #94a3b8)' }}>
+              PNG, JPG, SVG, WebP, or ICO up to {maxSizeMB}MB
+            </span>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.35rem', marginBottom: 0 }}>
+          ⚠️ {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
 // ── Color swatch ──────────────────────────────────────────────────
 
@@ -119,7 +300,7 @@ export default function AdminBrandingPage() {
     setDraft((prev) => ({ ...(prev ?? branding!), [name]: val }))
   }, [branding])
 
-  const handleTextChange = useCallback((name: string, val: string) => {
+  const handleTextChange = useCallback((name: string, val: string | null) => {
     setDraft((prev) => ({ ...(prev ?? branding!), [name]: val }))
   }, [branding])
 
@@ -205,36 +386,25 @@ export default function AdminBrandingPage() {
           <section className="branding-section">
             <h2 className="branding-section-title">Visual Identity</h2>
 
-            <div className="branding-field-group">
-              <label className="input-label">
-                Logo URL
-                <input
-                  type="url"
-                  className="input-field"
-                  placeholder="https://example.com/logo.png"
-                  value={effectiveBranding.logo_url ?? ''}
-                  onChange={(e) => handleTextChange('logo_url', e.target.value || null as unknown as string)}
-                />
-              </label>
-              {effectiveBranding.logo_url && (
-                <div className="branding-logo-preview">
-                  <img src={effectiveBranding.logo_url} alt="Logo preview" />
-                </div>
-              )}
-            </div>
+            <ImageUploadField
+              label="Brand Logo"
+              description="Upload your company logo to display on registration pages, emails, and webinar header"
+              value={effectiveBranding.logo_url ?? null}
+              onChange={(val) => handleTextChange('logo_url', val)}
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              maxSizeMB={2}
+              previewHeight={56}
+            />
 
-            <div className="branding-field-group">
-              <label className="input-label">
-                Favicon URL
-                <input
-                  type="url"
-                  className="input-field"
-                  placeholder="https://example.com/favicon.ico"
-                  value={effectiveBranding.favicon_url ?? ''}
-                  onChange={(e) => handleTextChange('favicon_url', e.target.value || null as unknown as string)}
-                />
-              </label>
-            </div>
+            <ImageUploadField
+              label="Favicon"
+              description="Upload your browser tab icon (recommended: 32x32 or 64x64 square PNG/ICO/SVG)"
+              value={effectiveBranding.favicon_url ?? null}
+              onChange={(val) => handleTextChange('favicon_url', val)}
+              accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
+              maxSizeMB={1}
+              previewHeight={36}
+            />
           </section>
 
           {/* Colour palette */}

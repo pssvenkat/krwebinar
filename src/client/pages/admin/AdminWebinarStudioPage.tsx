@@ -376,7 +376,11 @@ export default function AdminWebinarStudioPage() {
       sendMessage({
         type: 'POLL_END',
         pollId,
+        isHost: true,
       })
+      setPolls((prev) =>
+        prev.map((p) => (p.id === pollId ? { ...p, isActive: false } : p)),
+      )
     } else {
       const p = polls.find((item) => item.id === pollId)
       if (p) {
@@ -386,6 +390,7 @@ export default function AdminWebinarStudioPage() {
             question: p.question,
             options: p.options.map((opt) => opt.text),
           },
+          isHost: true,
         })
       }
     }
@@ -396,17 +401,28 @@ export default function AdminWebinarStudioPage() {
     sendMessage({
       type: 'QUESTION_ANSWER',
       questionId: qId,
+      isHost: true,
     })
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === qId ? { ...q, isAnswered: true } : q)),
+    )
   }
 
   // Submit written answer
   const handleSubmitAnswer = (qId: string) => {
-    if (!answerDraft.trim()) return
+    const text = answerDraft.trim()
+    if (!text) return
     sendMessage({
       type: 'QUESTION_ANSWER',
       questionId: qId,
-      answerText: answerDraft.trim(),
+      answerText: text,
+      isHost: true,
     })
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === qId ? { ...q, isAnswered: true, answerText: text } : q,
+      ),
+    )
     setAnsweringQuestionId(null)
     setAnswerDraft('')
   }

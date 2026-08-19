@@ -211,6 +211,77 @@ publicWebinarRoutes.post('/:id/register', zValidator('json', registerSchema), as
   )
 })
 
+const phoneVerifySchema = z.object({
+  webinarId: z.string().min(1),
+  phone: z.string().min(3).max(30),
+})
+
+// ── POST /attend/verify-phone ─────────────────────────────────────
+
+publicWebinarRoutes.post('/attend/verify-phone', zValidator('json', phoneVerifySchema), async (c) => {
+  const tenant = c.get('tenant')
+  const { webinarId, phone } = c.req.valid('json')
+  const db = c.env.DB
+
+  const webinar = await getWebinarById(db, tenant.id, webinarId)
+  if (!webinar) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Webinar not found or not available' } }, 404)
+  }
+
+  const inputDigits = phone.replace(/\D/g, '')
+  if (inputDigits.length < 4) {
+    return c.json({ ok: false, error: { code: 'INVALID_PHONE', message: 'Please enter a valid phone number' } }, 400)
+  }
+
+  // Find registrations for this specific webinar and tenant
+  const result = await db
+    .prepare('SELECT * FROM webinar_registrations WHERE webinar_id = ? AND tenant_id = ?')
+    .bind(webinar.id, tenant.id)
+    .all<any>()
+
+  const rows = result.results || []
+  const match = rows.find((r) => {
+    if (!r.phone_e164) return false
+    const rowDigits = r.phone_e164.replace(/\D/g, '')
+    return (
+      rowDigits === inputDigits ||
+      rowDigits.endsWith(inputDigits) ||
+      inputDigits.endsWith(rowDigits)
+    )
+  })
+
+  if (!match) {
+    return c.json(
+      {
+        ok: false,
+        error: {
+          code: 'NOT_REGISTERED',
+          message: 'This phone number is not registered for this webinar. Please register first.',
+        },
+      },
+      403,
+    )
+  }
+
+  return c.json({
+    ok: true,
+    data: {
+      accessToken: match.access_token,
+      registration: {
+        id: match.id,
+        name: match.name,
+        email: match.email,
+        phone: match.phone_e164,
+      },
+      webinar: {
+        id: webinar.id,
+        title: webinar.title,
+        status: webinar.status,
+      },
+    },
+  })
+})
+
 // ── GET /attend/:token ────────────────────────────────────────────
 
 publicWebinarRoutes.get('/attend/:token', async (c) => {

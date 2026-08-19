@@ -39,8 +39,8 @@ const brandingSchema = z.object({
   error_color:      hexColor.optional(),
   font_heading:     z.string().max(200).optional(),
   font_body:        z.string().max(200).optional(),
-  logo_url:         z.string().url().max(500).nullable().optional(),
-  favicon_url:      z.string().url().max(500).nullable().optional(),
+  logo_url:         z.string().max(2_000_000).nullable().optional(),
+  favicon_url:      z.string().max(2_000_000).nullable().optional(),
 }).strict()
 
 const settingsSchema = z.object({
