@@ -30,7 +30,8 @@ export function tenantMiddleware(): MiddlewareHandler<{ Bindings: Env; Variables
     }
 
     const db = c.env.DB
-    const host = c.req.header('host') ?? ''
+    const rawHost = c.req.header('host') ?? ''
+    const host = rawHost.split(':')[0].toLowerCase().trim()
     const platformDomain = c.env.PLATFORM_DOMAIN ?? 'platform.com'
 
     let tenant = null
