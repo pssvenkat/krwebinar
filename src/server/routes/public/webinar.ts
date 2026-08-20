@@ -23,6 +23,7 @@ import {
   markAttended,
   countFeedbackForRegistration,
   getWebinarById,
+  getTenantSettings,
 } from '../../lib/db'
 import { generateSecureToken } from '../../lib/jwt'
 import type { Env, HonoVariables } from '../../types'
@@ -185,10 +186,13 @@ publicWebinarRoutes.post('/:id/register', zValidator('json', registerSchema), as
     })
   }
 
-  // 7. Send confirmation email (non-blocking — best effort)
+  // 7. Send confirmation email from configured Business Profile support email (non-blocking)
+  const tenantSettings = await getTenantSettings(db, tenant.id)
+  const supportEmail = tenantSettings?.support_email || null
+
   const { sendConfirmationEmail } = await import('../../lib/email')
   c.executionCtx.waitUntil(
-    sendConfirmationEmail(c.env, registration, webinar, tenant).catch((err: unknown) =>
+    sendConfirmationEmail(c.env, registration, webinar, tenant, supportEmail).catch((err: unknown) =>
       console.warn('[Email] Confirmation send failed', err),
     ),
   )

@@ -77,9 +77,11 @@ function applyBrandingToRoot(branding: TenantBranding | null | undefined) {
 
   // Apply favicon if provided
   if (branding.faviconUrl) {
-    const existing = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    if (existing) {
-      existing.href = branding.faviconUrl
+    const existingLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']")
+    if (existingLinks.length > 0) {
+      existingLinks.forEach((link) => {
+        link.href = branding.faviconUrl!
+      })
     } else {
       const link = document.createElement('link')
       link.rel = 'icon'
@@ -98,8 +100,8 @@ export function useBranding() {
   const query = useQuery({
     queryKey: ['public', 'branding'],
     queryFn: fetchPublicBranding,
-    staleTime: 5 * 60_000,  // 5 minutes — branding changes rarely
-    retry: false,            // Don't loop on network error; fall back to CSS defaults
+    staleTime: 30_000,
+    retry: 1,
   })
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { useBranding } from '../../hooks/useBranding'
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -395,6 +396,7 @@ function QnAPanel({
 
 export default function AttendPage() {
   const { token } = useParams<{ token: string }>()
+  const { data: branding } = useBranding()
 
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'poll' | 'qna'>('chat')
   const [viewerCount, setViewerCount] = useState(1)
@@ -810,8 +812,16 @@ export default function AttendPage() {
           }}
         >
           <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🔒</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.platformName || 'Logo'}
+                style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain', marginBottom: '0.75rem' }}
+              />
+            ) : (
+              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🔒</span>
+            )}
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>
               Attendee Access Verification
             </span>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0.5rem 0 0.25rem', color: '#ffffff' }}>
@@ -943,15 +953,24 @@ export default function AttendPage() {
       {/* ── Top Bar ── */}
       <header className="attend-header">
         <div className="attend-header-inner">
-          <div className="attend-header-left">
-            <p className="attend-webinar-name">{webinar.title}</p>
-            <p className="attend-participant">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              {registration.name}
-            </p>
+          <div className="attend-header-left" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {branding?.logoUrl && (
+              <img
+                src={branding.logoUrl}
+                alt={branding.platformName || 'Logo'}
+                style={{ maxHeight: 32, maxWidth: 120, objectFit: 'contain' }}
+              />
+            )}
+            <div>
+              <p className="attend-webinar-name">{webinar.title}</p>
+              <p className="attend-participant">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {registration.name}
+              </p>
+            </div>
           </div>
           <div className="attend-header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <Badge variant="error" dot>LIVE STREAM</Badge>

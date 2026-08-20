@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useBranding } from '../../hooks/useBranding'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 
 export default function AdminLoginPage() {
   const { login } = useAuth()
+  const { data: branding } = useBranding()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,8 +41,16 @@ export default function AdminLoginPage() {
     <div className="admin-login-page">
       <div className="admin-login-card">
         <div className="admin-login-logo">
-          <div className="admin-login-logo-icon">🌱</div>
-          <h1 className="admin-login-title">Admin Portal</h1>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.platformName || 'Logo'}
+              style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain', marginBottom: '0.5rem' }}
+            />
+          ) : (
+            <div className="admin-login-logo-icon">🌱</div>
+          )}
+          <h1 className="admin-login-title">{branding?.platformName ? `${branding.platformName} Admin` : 'Admin Portal'}</h1>
           <p className="admin-login-subtitle">Sign in to manage your webinars</p>
         </div>
 

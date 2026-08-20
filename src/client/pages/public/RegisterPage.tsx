@@ -12,6 +12,7 @@ import { CountrySelect } from '../../components/ui/CountrySelect'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
 import { LoadingState, ErrorState } from '../../components/ui/States'
+import { useBranding } from '../../hooks/useBranding'
 
 // Turnstile site key — override via VITE_TURNSTILE_SITE_KEY env var
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
@@ -208,6 +209,7 @@ interface WebinarPublicData {
 
 export default function RegisterPage() {
   const { webinarId } = useParams<{ webinarId: string }>()
+  const { data: branding } = useBranding()
 
   const [formData, setFormData] = useState<FormData>({
     name: '', email: '', phone: '', countryCode: 'IN', city: '', consentMarketing: false,
@@ -321,6 +323,17 @@ export default function RegisterPage() {
   return (
     <div className="register-page">
       <div className="register-container">
+        {/* Brand Logo Header */}
+        {branding?.logoUrl && (
+          <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+            <img
+              src={branding.logoUrl}
+              alt={branding.platformName || 'Logo'}
+              style={{ maxHeight: 54, maxWidth: 220, objectFit: 'contain' }}
+            />
+          </div>
+        )}
+
         {/* Webinar summary card */}
         <div className="register-webinar-hero">
           <div className="register-webinar-meta">

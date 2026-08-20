@@ -1,5 +1,6 @@
 import React from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
+import { useBranding } from '../../hooks/useBranding'
 
 /**
  * Admin Layout
@@ -10,6 +11,8 @@ import { Outlet, NavLink } from 'react-router-dom'
  * Phase 5+: Vendor-branded header.
  */
 export default function AdminLayout() {
+  const { data: branding } = useBranding()
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-background)' }}>
       {/* Sidebar */}
@@ -29,37 +32,53 @@ export default function AdminLayout() {
         {/* Logo */}
         <div
           style={{
-            padding: 'var(--space-5) var(--space-6)',
+            padding: 'var(--space-4) var(--space-5)',
             borderBottom: '1.5px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-3)',
+            minHeight: '64px',
           }}
         >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1rem',
-            }}
-          >
-            🌱
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              fontSize: 'var(--text-base)',
-              color: 'var(--color-primary)',
-            }}
-          >
-            Admin
-          </div>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.platformName || 'Brand Logo'}
+              style={{
+                maxHeight: 38,
+                maxWidth: 160,
+                objectFit: 'contain',
+              }}
+            />
+          ) : (
+            <>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--color-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1rem',
+                  color: '#ffffff',
+                }}
+              >
+                🌱
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontWeight: 800,
+                  fontSize: 'var(--text-base)',
+                  color: 'var(--color-primary)',
+                }}
+              >
+                {branding?.platformName || 'Admin'}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Navigation */}

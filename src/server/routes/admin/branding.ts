@@ -48,6 +48,9 @@ const settingsSchema = z.object({
   max_participants:                z.number().int().min(1).max(10000).optional(),
   chat_rate_limit_messages:        z.number().int().min(1).max(100).optional(),
   chat_rate_limit_window_seconds:  z.number().int().min(5).max(3600).optional(),
+  support_email:                   z.string().email().nullable().optional(),
+  timezone:                        z.string().max(100).optional(),
+  locale:                          z.string().max(20).optional(),
 }).strict()
 
 // ── Admin branding routes (auth required) ─────────────────────────

@@ -858,19 +858,25 @@ export interface SettingsRow {
   max_participants: number
   chat_rate_limit_messages: number
   chat_rate_limit_window_seconds: number
+  support_email?: string | null
+  timezone?: string | null
+  locale?: string | null
 }
 
 export async function getSettings(db: D1Database, tenantId: string): Promise<SettingsRow> {
   const row = await db
     .prepare('SELECT * FROM tenant_settings WHERE tenant_id = ?')
     .bind(tenantId)
-    .first<SettingsRow>()
+    .first<any>()
 
   return {
     max_webinars: row?.max_webinars ?? 10,
     max_participants: row?.max_participants ?? 300,
     chat_rate_limit_messages: row?.chat_rate_limit_messages ?? 5,
     chat_rate_limit_window_seconds: row?.chat_rate_limit_window_seconds ?? 10,
+    support_email: row?.support_email ?? null,
+    timezone: row?.timezone ?? 'Asia/Kolkata',
+    locale: row?.locale ?? 'en-IN',
   }
 }
 
@@ -886,19 +892,24 @@ export async function upsertSettings(
     .prepare(
       `INSERT INTO tenant_settings
          (id, tenant_id, max_webinars, max_participants,
-          chat_rate_limit_messages, chat_rate_limit_window_seconds, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          chat_rate_limit_messages, chat_rate_limit_window_seconds,
+          support_email, timezone, locale, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
        ON CONFLICT(tenant_id) DO UPDATE SET
          max_webinars = excluded.max_webinars,
          max_participants = excluded.max_participants,
          chat_rate_limit_messages = excluded.chat_rate_limit_messages,
          chat_rate_limit_window_seconds = excluded.chat_rate_limit_window_seconds,
+         support_email = excluded.support_email,
+         timezone = excluded.timezone,
+         locale = excluded.locale,
          updated_at = datetime('now')`,
     )
     .bind(
       generateULID(), tenantId,
       merged.max_webinars, merged.max_participants,
       merged.chat_rate_limit_messages, merged.chat_rate_limit_window_seconds,
+      merged.support_email ?? null, merged.timezone ?? 'Asia/Kolkata', merged.locale ?? 'en-IN',
     )
     .run()
 }

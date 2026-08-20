@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useBranding } from '../../hooks/useBranding'
 import type { ApiResponse, HealthResponse } from '../../../shared/types'
 
 /**
@@ -7,12 +8,9 @@ import type { ApiResponse, HealthResponse } from '../../../shared/types'
  * Public landing page for the webinar platform.
  * In production, this might redirect to the vendor's page
  * or show a platform-level directory.
- *
- * Phase 1: Minimal shell with platform status indicator.
- * Phase 2+: Full design system applied.
- * Phase 10: Full participant experience.
  */
 export default function HomePage() {
+  const { data: branding } = useBranding()
   const { data, isLoading, isError } = useQuery({
     queryKey: ['health'],
     queryFn: async (): Promise<HealthResponse> => {
@@ -45,37 +43,47 @@ export default function HomePage() {
           marginBottom: 'var(--space-10)',
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--color-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontSize: '1.5rem',
-          }}
-        >
-          🌱
-        </div>
-        <div>
+        {branding?.logoUrl ? (
+          <img
+            src={branding.logoUrl}
+            alt={branding.platformName || 'Brand Logo'}
+            style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain' }}
+          />
+        ) : (
           <div
             style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              fontSize: 'var(--text-xl)',
-              color: 'var(--color-primary)',
-              lineHeight: 1,
+              width: 48,
+              height: 48,
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '1.5rem',
             }}
           >
-            WebinarPlatform
+            🌱
           </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)' }}>
-            Multi-tenant · White-label · Live
+        )}
+        {!branding?.logoUrl && (
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontWeight: 800,
+                fontSize: 'var(--text-xl)',
+                color: 'var(--color-primary)',
+                lineHeight: 1,
+              }}
+            >
+              {branding?.platformName || 'WebinarPlatform'}
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)' }}>
+              Live Learning & Engagement
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Hero text */}

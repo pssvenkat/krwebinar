@@ -8,7 +8,10 @@
  */
 
 import { Hono } from 'hono'
-import { getTenantBranding, getTenantSettings } from '../lib/db'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { getTenantBranding, getTenantSettings, upsertSettings } from '../lib/db'
+import { requireAuth } from '../middleware/auth'
 import type { Env, HonoVariables } from '../types'
 
 export const tenantRoutes = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
@@ -55,13 +58,32 @@ tenantRoutes.get('/', async (c) => {
         : null,
       settings: settings
         ? {
-            timezone: settings.timezone,
-            locale: settings.locale,
-            supportEmail: settings.support_email,
+            timezone: settings.timezone ?? 'Asia/Kolkata',
+            locale: settings.locale ?? 'en-IN',
+            supportEmail: settings.support_email ?? null,
             registrationFields: JSON.parse(settings.registration_fields || '[]') as string[],
             consentPurposes: JSON.parse(settings.consent_purposes || '[]') as string[],
           }
         : null,
     },
   })
+})
+
+const updateProfileSchema = z.object({
+  supportEmail: z.string().email('Must be a valid email address').optional(),
+  timezone: z.string().max(100).optional(),
+  locale: z.string().max(20).optional(),
+})
+
+tenantRoutes.put('/', requireAuth(), zValidator('json', updateProfileSchema), async (c) => {
+  const tenant = c.get('tenant')
+  const { supportEmail, timezone, locale } = c.req.valid('json')
+
+  await upsertSettings(c.env.DB, tenant.id, {
+    support_email: supportEmail,
+    timezone,
+    locale,
+  })
+
+  return c.json({ ok: true, message: 'Profile updated successfully' })
 })

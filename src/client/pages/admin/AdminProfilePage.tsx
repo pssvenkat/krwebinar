@@ -51,22 +51,42 @@ export default function AdminProfilePage() {
     queryFn: fetchProfile,
   })
 
-  const [supportEmail, setSupportEmail] = useState('')
-  const [timezone, setTimezone] = useState('')
+  const [supportEmail, setSupportEmail] = useState<string | null>(null)
+  const [timezone, setTimezone] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const currentSupportEmail = supportEmail ?? data?.supportEmail ?? 'support@kravemicrogreens.in'
+  const currentTimezone = timezone ?? data?.timezone ?? 'Asia/Kolkata'
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Simulate save
-      await new Promise((r) => setTimeout(r, 400))
-      void supportEmail
-      void timezone
+      setSaveError(null)
+      const token = getAccessToken()
+      const res = await fetch('/api/v1/tenant', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Slug': 'krave',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          supportEmail: currentSupportEmail,
+          timezone: currentTimezone,
+        }),
+      })
+      const json = await res.json() as { ok: boolean; error?: { message: string } }
+      if (!json.ok) throw new Error(json.error?.message ?? 'Failed to update profile')
       return true
     },
     onSuccess: () => {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
       qc.invalidateQueries({ queryKey: ['admin', 'profile'] })
+      qc.invalidateQueries({ queryKey: ['public', 'branding'] })
+    },
+    onError: (err: any) => {
+      setSaveError(err.message || 'Failed to save profile settings')
     },
   })
 
@@ -93,6 +113,7 @@ export default function AdminProfilePage() {
       </div>
 
       {saved && <Alert variant="success">Profile settings updated successfully!</Alert>}
+      {saveError && <Alert variant="error">{saveError}</Alert>}
 
       <div className="branding-section" style={{ maxWidth: 600 }}>
         <h3 className="branding-section-title">Organization Overview</h3>
@@ -138,16 +159,19 @@ export default function AdminProfilePage() {
             type="email"
             className="platform-input"
             placeholder="support@yourbrand.com"
-            defaultValue={profile.supportEmail}
+            value={currentSupportEmail}
             onChange={(e) => setSupportEmail(e.target.value)}
           />
+          <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+            This email address is used as the sender and reply-to address for attendee registration and webinar reminder emails.
+          </p>
         </div>
 
         <div className="platform-field">
           <label className="platform-label">Default Timezone</label>
           <select
             className="platform-input"
-            defaultValue={profile.timezone}
+            value={currentTimezone}
             onChange={(e) => setTimezone(e.target.value)}
           >
             <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
