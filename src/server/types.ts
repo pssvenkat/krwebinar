@@ -133,6 +133,7 @@ export interface DbWebinar {
   status: string
   max_participants: number
   registration_open: number
+  feedback_interests?: string | null
   created_by: string | null
   created_at: string
   updated_at: string

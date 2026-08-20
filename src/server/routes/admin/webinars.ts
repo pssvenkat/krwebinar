@@ -44,6 +44,13 @@ function serializeWebinar(w: DbWebinar) {
     status: w.status,
     maxParticipants: w.max_participants,
     registrationOpen: w.registration_open === 1,
+    feedbackInterests: (() => {
+      try {
+        return w.feedback_interests ? (JSON.parse(w.feedback_interests) as string[]) : []
+      } catch {
+        return []
+      }
+    })(),
     createdAt: w.created_at,
     updatedAt: w.updated_at,
   }
@@ -61,6 +68,7 @@ const createSchema = z.object({
   timezone: z.string().max(50).optional(),
   youtubeVideoId: z.string().max(20).optional(),
   maxParticipants: z.number().int().min(1).max(10000).optional(),
+  feedbackInterests: z.array(z.string().max(200)).optional(),
 })
 
 const updateSchema = createSchema.partial().extend({

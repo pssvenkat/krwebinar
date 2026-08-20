@@ -354,6 +354,13 @@ publicWebinarRoutes.get('/attend/:token', async (c) => {
         status: webinar.status,
         // YouTube ID is revealed here — only to registered participants
         youtubeVideoId: webinar.youtube_video_id,
+        feedbackInterests: (() => {
+          try {
+            return webinar.feedback_interests ? (JSON.parse(webinar.feedback_interests) as string[]) : []
+          } catch {
+            return []
+          }
+        })(),
         isLive: webinar.status === 'LIVE',
         isEnded: webinar.status === 'ENDED',
       },

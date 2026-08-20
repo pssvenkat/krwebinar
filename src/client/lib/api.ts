@@ -247,6 +247,7 @@ export interface WebinarSummary {
   status: string
   maxParticipants: number
   registrationOpen: boolean
+  feedbackInterests?: string[]
 }
 
 export interface WebinarDetail extends WebinarSummary {
@@ -267,6 +268,7 @@ export interface CreateWebinarInput {
   maxParticipants?: number
   youtubeVideoId?: string
   registrationOpen?: boolean
+  feedbackInterests?: string[]
 }
 
 export interface PlatformAnalytics {

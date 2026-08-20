@@ -25,6 +25,14 @@ const TIMEZONES = [
 
 // ── Form ─────────────────────────────────────────────────────────
 
+const DEFAULT_INTEREST_SUGGESTIONS = [
+  'Buy a home microgreens kit',
+  'Bulk supply for restaurant / hotel',
+  'Corporate wellness program',
+  'Consulting & commercial growing',
+  'Become a reseller / distributor',
+]
+
 type FormData = {
   title: string
   description: string
@@ -36,6 +44,7 @@ type FormData = {
   youtubeVideoId: string
   maxParticipants: string
   registrationOpen: boolean
+  feedbackInterests: string[]
 }
 
 const EMPTY_FORM: FormData = {
@@ -49,9 +58,10 @@ const EMPTY_FORM: FormData = {
   youtubeVideoId: '',
   maxParticipants: '100',
   registrationOpen: true,
+  feedbackInterests: DEFAULT_INTEREST_SUGGESTIONS,
 }
 
-function webinarToForm(w: CreateWebinarInput): FormData {
+function webinarToForm(w: any): FormData {
   return {
     title: w.title,
     description: w.description ?? '',
@@ -63,6 +73,9 @@ function webinarToForm(w: CreateWebinarInput): FormData {
     youtubeVideoId: w.youtubeVideoId ?? '',
     maxParticipants: w.maxParticipants?.toString() ?? '100',
     registrationOpen: w.registrationOpen ?? true,
+    feedbackInterests: Array.isArray(w.feedbackInterests) && w.feedbackInterests.length > 0
+      ? w.feedbackInterests
+      : DEFAULT_INTEREST_SUGGESTIONS,
   }
 }
 
@@ -78,18 +91,35 @@ export default function AdminWebinarFormPage() {
   const updateMutation = useUpdateWebinar(id!)
 
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
+  const [newInterest, setNewInterest] = useState('')
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [savedAsDraft, setSavedAsDraft] = useState(false)
 
   // Populate form when editing
   useEffect(() => {
     if (existingWebinar) {
-      setForm(webinarToForm(existingWebinar as unknown as CreateWebinarInput))
+      setForm(webinarToForm(existingWebinar))
     }
   }, [existingWebinar])
 
   const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((f) => ({ ...f, [field]: e.target.value }))
+  }
+
+  const handleAddInterest = () => {
+    const trimmed = newInterest.trim()
+    if (!trimmed) return
+    if (!form.feedbackInterests.includes(trimmed)) {
+      setForm((f) => ({ ...f, feedbackInterests: [...f.feedbackInterests, trimmed] }))
+    }
+    setNewInterest('')
+  }
+
+  const handleRemoveInterest = (indexToRemove: number) => {
+    setForm((f) => ({
+      ...f,
+      feedbackInterests: f.feedbackInterests.filter((_, idx) => idx !== indexToRemove),
+    }))
   }
 
   const toPayload = (): CreateWebinarInput => ({
@@ -103,6 +133,7 @@ export default function AdminWebinarFormPage() {
     youtubeVideoId: form.youtubeVideoId.trim() || undefined,
     maxParticipants: form.maxParticipants ? parseInt(form.maxParticipants, 10) : undefined,
     registrationOpen: form.registrationOpen,
+    feedbackInterests: form.feedbackInterests.filter(Boolean),
   })
 
   const handleSave = async (e: React.FormEvent) => {
@@ -272,6 +303,89 @@ export default function AdminWebinarFormPage() {
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, registrationOpen: e.target.checked }))}
             hint="Uncheck to pause registrations without unpublishing"
           />
+        </section>
+
+        {/* Post-Webinar Feedback & Interest Areas */}
+        <section className="admin-form-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div>
+              <h2 className="admin-form-section-title" style={{ margin: 0 }}>Feedback Survey Interests</h2>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+                Configure the interest areas attendees can choose when submitting feedback for this webinar.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setForm((f) => ({ ...f, feedbackInterests: DEFAULT_INTEREST_SUGGESTIONS }))}
+            >
+              Reset Suggestions
+            </Button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Consulting & commercial growing, Starter kit, Bulk supply..."
+              value={newInterest}
+              onChange={(e) => setNewInterest(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddInterest()
+                }
+              }}
+            />
+            <Button type="button" variant="secondary" size="md" onClick={handleAddInterest}>
+              + Add
+            </Button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {form.feedbackInterests.map((interest, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.5rem 0.75rem',
+                  background: 'var(--color-surface, #f8fafc)',
+                  border: '1px solid var(--color-border, #e2e8f0)',
+                  borderRadius: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', width: '20px' }}>
+                    {idx + 1}.
+                  </span>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{interest}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveInterest(idx)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    padding: '2px 8px',
+                  }}
+                  title="Remove interest"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {form.feedbackInterests.length === 0 && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', fontStyle: 'italic', margin: 0 }}>
+                No custom interests added. Default general questions will be shown.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* Actions */}

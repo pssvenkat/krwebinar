@@ -178,17 +178,21 @@ export async function createWebinar(
     timezone?: string
     youtubeVideoId?: string
     maxParticipants?: number
+    feedbackInterests?: string[] | string | null
   },
 ): Promise<DbWebinar> {
   const id = generateULID()
   const now = new Date().toISOString()
+  const interestsJson = data.feedbackInterests
+    ? (typeof data.feedbackInterests === 'string' ? data.feedbackInterests : JSON.stringify(data.feedbackInterests))
+    : null
 
   await db
     .prepare(
       `INSERT INTO webinars
        (id, tenant_id, title, description, host_name, start_date, start_time,
-        end_time, timezone, youtube_video_id, max_participants, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        end_time, timezone, youtube_video_id, max_participants, feedback_interests, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, tenantId,
@@ -199,6 +203,7 @@ export async function createWebinar(
       data.timezone ?? 'Asia/Kolkata',
       data.youtubeVideoId ?? null,
       data.maxParticipants ?? 300,
+      interestsJson,
       userId, now, now,
     )
     .run()
@@ -222,6 +227,7 @@ export async function updateWebinar(
     status: string
     maxParticipants: number
     registrationOpen: boolean
+    feedbackInterests: string[] | string | null
   }>,
 ): Promise<DbWebinar | null> {
   const sets: string[] = []
@@ -238,6 +244,16 @@ export async function updateWebinar(
   if (data.status !== undefined)          { sets.push('status = ?');              values.push(data.status) }
   if (data.maxParticipants !== undefined) { sets.push('max_participants = ?');   values.push(data.maxParticipants) }
   if (data.registrationOpen !== undefined){ sets.push('registration_open = ?');  values.push(data.registrationOpen ? 1 : 0) }
+  if (data.feedbackInterests !== undefined) {
+    sets.push('feedback_interests = ?')
+    values.push(
+      data.feedbackInterests === null
+        ? null
+        : typeof data.feedbackInterests === 'string'
+        ? data.feedbackInterests
+        : JSON.stringify(data.feedbackInterests),
+    )
+  }
 
   if (sets.length === 0) return getWebinarById(db, tenantId, webinarId)
 

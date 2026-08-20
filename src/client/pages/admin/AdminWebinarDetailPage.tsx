@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   useWebinar, useRegistrations, usePublishWebinar,
-  useGoLiveWebinar, useEndWebinar, useArchiveWebinar
+  useGoLiveWebinar, useEndWebinar, useArchiveWebinar, useUpdateWebinar
 } from '../../hooks/useWebinars'
 import { useLeads, downloadLeadsCsv } from '../../hooks/useLeads'
 import type { Lead, LeadsSummary } from '../../hooks/useLeads'
@@ -287,9 +287,153 @@ function LeadsPanel({ webinarId }: { webinarId: string }) {
   )
 }
 
+// ── Feedback Settings Tab ─────────────────────────────────────────
+
+function FeedbackSettingsTab({
+  webinar,
+  onSave,
+  isPending,
+}: {
+  webinar: any
+  onSave: (interests: string[]) => Promise<void>
+  isPending: boolean
+}) {
+  const defaultList = [
+    'Buy a home microgreens kit',
+    'Bulk supply for restaurant / hotel',
+    'Corporate wellness program',
+    'Consulting & commercial growing',
+    'Become a reseller / distributor',
+  ]
+  const [interests, setInterests] = useState<string[]>(
+    Array.isArray(webinar.feedbackInterests) && webinar.feedbackInterests.length > 0
+      ? webinar.feedbackInterests
+      : defaultList,
+  )
+  const [newInterest, setNewInterest] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  const handleAdd = () => {
+    const trimmed = newInterest.trim()
+    if (!trimmed) return
+    if (!interests.includes(trimmed)) {
+      setInterests((prev) => [...prev, trimmed])
+    }
+    setNewInterest('')
+  }
+
+  const handleRemove = (idx: number) => {
+    setInterests((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  const handleSave = async () => {
+    await onSave(interests.filter(Boolean))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  return (
+    <div style={{ maxWidth: '640px', padding: '0.5rem 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Feedback Form Interest Options</h3>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            These interest checkboxes will be presented to attendees when submitting post-webinar feedback.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setInterests(defaultList)}
+        >
+          Reset Suggestions
+        </Button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+        <input
+          type="text"
+          className="platform-input"
+          placeholder="Add custom interest or product inquiry..."
+          value={newInterest}
+          onChange={(e) => setNewInterest(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleAdd()
+            }
+          }}
+          style={{ flex: 1 }}
+        />
+        <Button type="button" variant="secondary" size="md" onClick={handleAdd}>
+          + Add
+        </Button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        {interests.map((item, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.6rem 0.85rem',
+              background: 'var(--color-surface, #f8fafc)',
+              border: '1px solid var(--color-border, #e2e8f0)',
+              borderRadius: '6px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', width: '20px' }}>
+                {idx + 1}.
+              </span>
+              <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{item}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleRemove(idx)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: '#ef4444',
+                cursor: 'pointer',
+                fontSize: '1.1rem',
+                padding: '2px 8px',
+              }}
+              title="Remove interest"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {interests.length === 0 && (
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', fontStyle: 'italic', margin: 0 }}>
+            No custom interests added. Attendees will be shown standard default questions.
+          </p>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          loading={isPending}
+          onClick={handleSave}
+        >
+          {isPending ? 'Saving…' : 'Save Feedback Interests'}
+        </Button>
+        {saved && <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.85rem' }}>✓ Interests Updated</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────
 
-type Tab = 'registrations' | 'leads'
+type Tab = 'registrations' | 'leads' | 'feedback-form'
 
 export default function AdminWebinarDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -298,6 +442,7 @@ export default function AdminWebinarDetailPage() {
 
   const { data: webinar, isLoading, error } = useWebinar(id)
   const { data: regData, isLoading: regsLoading } = useRegistrations(id)
+  const updateMutation = useUpdateWebinar(id!)
 
   if (isLoading) return <LoadingState label="Loading webinar…" />
   if (error || !webinar) return <ErrorState error={error as Error} />
@@ -358,7 +503,7 @@ export default function AdminWebinarDetailPage() {
         </div>
       </div>
 
-      {/* Tabs: Registrations | Leads */}
+      {/* Tabs: Registrations | Leads | Feedback Form */}
       <div className="admin-section">
         <div className="admin-tabs">
           <button
@@ -376,6 +521,13 @@ export default function AdminWebinarDetailPage() {
           >
             Leads &amp; Feedback
           </button>
+          <button
+            type="button"
+            className={`admin-tab${tab === 'feedback-form' ? ' admin-tab--active' : ''}`}
+            onClick={() => setTab('feedback-form')}
+          >
+            ⚙️ Feedback Form Settings
+          </button>
         </div>
 
         <div className="admin-tab-content">
@@ -388,8 +540,16 @@ export default function AdminWebinarDetailPage() {
                 title={w.title}
               />
             )
-          ) : (
+          ) : tab === 'leads' ? (
             <LeadsPanel webinarId={id!} />
+          ) : (
+            <FeedbackSettingsTab
+              webinar={w}
+              isPending={updateMutation.isPending}
+              onSave={async (feedbackInterests) => {
+                await updateMutation.mutateAsync({ feedbackInterests })
+              }}
+            />
           )}
         </div>
       </div>

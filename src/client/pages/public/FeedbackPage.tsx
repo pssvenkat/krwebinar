@@ -20,12 +20,12 @@ type FeedbackData = {
   consentContact?: boolean
 }
 
-const INTEREST_OPTIONS = [
-  { value: 'microgreens_kit',    label: 'Buy a home microgreens kit' },
-  { value: 'bulk_supply',        label: 'Bulk supply for restaurant / hotel' },
-  { value: 'corporate_wellness', label: 'Corporate wellness program' },
-  { value: 'learn_more',        label: 'Just learning — tell me more' },
-  { value: 'reseller',          label: 'Become a reseller / distributor' },
+const DEFAULT_INTEREST_OPTIONS = [
+  'Buy a home microgreens kit',
+  'Bulk supply for restaurant / hotel',
+  'Corporate wellness program',
+  'Just learning — tell me more',
+  'Become a reseller / distributor',
 ]
 
 const CONTACT_OPTIONS = [
@@ -134,6 +134,12 @@ export default function FeedbackPage() {
     }
   }
 
+  const customInterests = (attendData?.webinar as any)?.feedbackInterests
+  const interestList: string[] =
+    Array.isArray(customInterests) && customInterests.length > 0
+      ? customInterests
+      : DEFAULT_INTEREST_OPTIONS
+
   if (attendLoading) return <div className="feedback-page"><div className="feedback-container"><LoadingState label="Loading…" /></div></div>
   if (attendError || !attendData) {
     return (
@@ -199,13 +205,13 @@ export default function FeedbackPage() {
               <span className="feedback-optional">(select all that apply)</span>
             </p>
             <div className="feedback-interests">
-              {INTEREST_OPTIONS.map((opt) => (
+              {interestList.map((item, idx) => (
                 <Checkbox
-                  key={opt.value}
-                  id={`fb-interest-${opt.value}`}
-                  label={opt.label}
-                  checked={(form.interests ?? []).includes(opt.value)}
-                  onChange={(_e: React.ChangeEvent<HTMLInputElement>) => toggleInterest(opt.value)}
+                  key={idx}
+                  id={`fb-interest-${idx}`}
+                  label={item}
+                  checked={(form.interests ?? []).includes(item)}
+                  onChange={() => toggleInterest(item)}
                 />
               ))}
             </div>
