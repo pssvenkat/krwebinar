@@ -12,12 +12,44 @@ import {
   getLeadsForWebinar,
   getLeadsSummary,
   getLeadsCsvRows,
+  getAllLeadsForTenant,
 } from '../../lib/db'
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
 
 // All leads routes require admin auth
 app.use('*', requireAuth())
+
+// ── GET /leads & /leads/overview (Tenant-wide) ────────────────────
+
+async function handleAllLeads(c: any) {
+  const tenant = c.get('tenant')
+  const rows = await getAllLeadsForTenant(c.env.DB, tenant.id)
+
+  const parsed = rows.map((l) => ({
+    id: l.id,
+    webinar_id: l.webinar_id,
+    webinar_title: l.webinar_title,
+    name: l.name,
+    email: l.email,
+    phone_e164: l.phone_e164,
+    country_code: l.country_code,
+    city: l.city,
+    star_rating: l.rating,
+    interest_areas: (() => {
+      try { return JSON.parse(l.interests) as string[] } catch { return [] }
+    })(),
+    consent_follow_up: l.contact_requested,
+    preferred_contact: l.preferred_contact,
+    feedback_notes: l.suggestion,
+    submitted_at: l.created_at,
+  }))
+
+  return c.json({ ok: true, data: { leads: parsed, total: parsed.length } })
+}
+
+app.get('/leads', handleAllLeads)
+app.get('/leads/overview', handleAllLeads)
 
 // ── GET /webinars/:id/leads ───────────────────────────────────────
 

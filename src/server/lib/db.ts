@@ -1079,6 +1079,45 @@ export async function getLeadsCsvRows(
   }))
 }
 
+/** All leads across all webinars for a tenant */
+export async function getAllLeadsForTenant(
+  db: D1Database,
+  tenantId: string,
+): Promise<{
+  id: string
+  webinar_id: string
+  webinar_title: string
+  name: string
+  email: string
+  phone_e164: string | null
+  country_code: string | null
+  city: string | null
+  interests: string
+  rating: number | null
+  suggestion: string | null
+  contact_requested: number
+  preferred_contact: string | null
+  created_at: string
+}[]> {
+  const result = await db
+    .prepare(
+      `SELECT lc.id, lc.webinar_id, lc.name, lc.email, lc.phone_e164, lc.country_code,
+              lc.interests, lc.rating, lc.suggestion, lc.contact_requested,
+              lc.preferred_contact, lc.created_at,
+              w.title AS webinar_title,
+              r.city AS city
+       FROM lead_captures lc
+       JOIN webinars w ON w.id = lc.webinar_id
+       LEFT JOIN webinar_registrations r ON r.id = lc.registration_id
+       WHERE lc.tenant_id = ?
+       ORDER BY lc.created_at DESC`,
+    )
+    .bind(tenantId)
+    .all<any>()
+
+  return result.results
+}
+
 // ── Phase 12: Platform admin helpers ─────────────────────────────
 
 export interface PlatformTenant {
