@@ -39,9 +39,10 @@ const brandingSchema = z.object({
   error_color:      hexColor.optional(),
   font_heading:     z.string().max(200).optional(),
   font_body:        z.string().max(200).optional(),
-  logo_url:         z.string().max(2_000_000).nullable().optional(),
-  favicon_url:      z.string().max(2_000_000).nullable().optional(),
-}).strict()
+  logo_url:         z.string().nullable().optional(),
+  favicon_url:      z.string().nullable().optional(),
+  custom_css:       z.string().nullable().optional(),
+}).passthrough()
 
 const settingsSchema = z.object({
   max_webinars:                    z.number().int().min(1).max(1000).optional(),
@@ -51,7 +52,7 @@ const settingsSchema = z.object({
   support_email:                   z.string().email().nullable().optional(),
   timezone:                        z.string().max(100).optional(),
   locale:                          z.string().max(20).optional(),
-}).strict()
+}).passthrough()
 
 // ── Admin branding routes (auth required) ─────────────────────────
 

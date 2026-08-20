@@ -2,8 +2,63 @@ import { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoadingState, ErrorState } from '../../components/ui/States'
 import { Button } from '../../components/ui/Button'
+import { Alert } from '../../components/ui/Alert'
 import { api } from '../../lib/api'
 import type { BrandingData, SettingsData } from '../../lib/api'
+
+// ── Image Resizer Helper ──────────────────────────────────────────
+
+function resizeImageFile(
+  file: File,
+  maxWidth: number,
+  maxHeight: number,
+  quality = 0.9,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (file.type === 'image/svg+xml') {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('Failed to read SVG file'))
+      reader.readAsDataURL(file)
+      return
+    }
+
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, width)
+      canvas.height = Math.max(1, height)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas context unavailable'))
+        return
+      }
+
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      // PNG preserves alpha transparency for logos and favicons
+      const dataUrl = canvas.toDataURL('image/png', quality)
+      resolve(dataUrl)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image file'))
+    }
+    img.src = url
+  })
+}
 
 // ── File Upload Component ─────────────────────────────────────────
 
@@ -13,8 +68,9 @@ function ImageUploadField({
   value,
   onChange,
   accept = 'image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon,image/vnd.microsoft.icon',
-  maxSizeMB = 2,
+  maxSizeMB = 5,
   previewHeight = 56,
+  maxDimension = 800,
 }: {
   label: string
   description?: string
@@ -23,12 +79,14 @@ function ImageUploadField({
   accept?: string
   maxSizeMB?: number
   previewHeight?: number
+  maxDimension?: number
 }) {
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [processing, setProcessing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setError(null)
     if (!file) return
 
@@ -37,22 +95,22 @@ function ImageUploadField({
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      onChange(result)
+    try {
+      setProcessing(true)
+      const dataUrl = await resizeImageFile(file, maxDimension, maxDimension)
+      onChange(dataUrl)
+    } catch (err: any) {
+      setError(err?.message || 'Failed to process image file')
+    } finally {
+      setProcessing(false)
     }
-    reader.onerror = () => {
-      setError('Failed to read image file')
-    }
-    reader.readAsDataURL(file)
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0])
+      void processFile(e.dataTransfer.files[0])
     }
   }
 
@@ -94,12 +152,16 @@ function ImageUploadField({
           style={{ display: 'none' }}
           onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
-              processFile(e.target.files[0])
+              void processFile(e.target.files[0])
             }
           }}
         />
 
-        {value ? (
+        {processing ? (
+          <div style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            Processing image…
+          </div>
+        ) : value ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', justifyContent: 'space-between', padding: '0.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div
@@ -308,6 +370,8 @@ export default function AdminBrandingPage() {
     setDraftSettings((prev) => ({ ...(prev ?? settings!), [name]: val }))
   }, [settings])
 
+  const [saveError, setSaveError] = useState<string | null>(null)
+
   // Save mutations
   const brandingMutation = useMutation({
     mutationFn: async (data: Partial<BrandingData>) => {
@@ -318,6 +382,7 @@ export default function AdminBrandingPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin', 'branding'] })
       void qc.invalidateQueries({ queryKey: ['public', 'branding'] })
+      void qc.invalidateQueries({ queryKey: ['tenant'] })
     },
   })
 
@@ -327,23 +392,55 @@ export default function AdminBrandingPage() {
       if (!res.ok) throw new Error(res.error.message)
       return res.data
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'settings'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'settings'] })
+      void qc.invalidateQueries({ queryKey: ['tenant'] })
+    },
   })
 
   const handleSave = async () => {
-    const promises: Promise<unknown>[] = []
-    if (draft) promises.push(brandingMutation.mutateAsync(draft))
-    if (draftSettings) promises.push(settingsMutation.mutateAsync(draftSettings))
-    await Promise.all(promises)
-    setDraft(null)
-    setDraftSettings(null)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    setSaveError(null)
+    try {
+      const promises: Promise<unknown>[] = []
+      if (draft) {
+        // Strip out non-branding properties and guarantee null instead of undefined
+        const cleanBranding: Partial<BrandingData> = {
+          primary_color: draft.primary_color,
+          secondary_color: draft.secondary_color,
+          accent_color: draft.accent_color,
+          background_color: draft.background_color,
+          surface_color: draft.surface_color,
+          text_color: draft.text_color,
+          muted_color: draft.muted_color,
+          border_color: draft.border_color,
+          success_color: draft.success_color,
+          warning_color: draft.warning_color,
+          error_color: draft.error_color,
+          font_heading: draft.font_heading,
+          font_body: draft.font_body,
+          logo_url: draft.logo_url ?? null,
+          favicon_url: draft.favicon_url ?? null,
+        }
+        promises.push(brandingMutation.mutateAsync(cleanBranding))
+      }
+      if (draftSettings) {
+        promises.push(settingsMutation.mutateAsync(draftSettings))
+      }
+      await Promise.all(promises)
+      setDraft(null)
+      setDraftSettings(null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err: any) {
+      console.error('[Branding] Save failed:', err)
+      setSaveError(err.message || 'Failed to save branding changes. Please check your network connection and try again.')
+    }
   }
 
   const handleReset = () => {
     setDraft(null)
     setDraftSettings(null)
+    setSaveError(null)
   }
 
   if (bLoading || sLoading) return <LoadingState label="Loading branding settings…" />
@@ -378,6 +475,14 @@ export default function AdminBrandingPage() {
         </div>
       </div>
 
+      {saveError && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Alert variant="error" title="Save Failed" onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        </div>
+      )}
+
       <div className="branding-layout">
         {/* ── Left: settings panels ── */}
         <div className="branding-panels">
@@ -392,8 +497,9 @@ export default function AdminBrandingPage() {
               value={effectiveBranding.logo_url ?? null}
               onChange={(val) => handleTextChange('logo_url', val)}
               accept="image/png,image/jpeg,image/svg+xml,image/webp"
-              maxSizeMB={2}
+              maxSizeMB={5}
               previewHeight={56}
+              maxDimension={800}
             />
 
             <ImageUploadField
@@ -402,8 +508,9 @@ export default function AdminBrandingPage() {
               value={effectiveBranding.favicon_url ?? null}
               onChange={(val) => handleTextChange('favicon_url', val)}
               accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
-              maxSizeMB={1}
+              maxSizeMB={2}
               previewHeight={36}
+              maxDimension={128}
             />
           </section>
 
