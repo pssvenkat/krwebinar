@@ -124,36 +124,45 @@ function RegistrationsTable({ registrations, title }: { registrations: Registrat
         <span className="admin-table-count">{registrations.length} registrant{registrations.length !== 1 ? 's' : ''}</span>
         <Button
           id="export-csv"
-          variant="ghost"
+          variant="secondary"
           size="sm"
           onClick={() => exportCSV(registrations, title)}
         >
-          ↓ Export CSV
+          ↓ Export CSV ({registrations.length})
         </Button>
       </div>
       <div className="admin-table-wrapper">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Country</th>
-              <th>Registered</th>
-              <th>Attended</th>
+              <th>Attendee</th>
+              <th>Phone Number</th>
+              <th>City / Country</th>
+              <th>Attendance</th>
+              <th>Registered Date</th>
             </tr>
           </thead>
           <tbody>
             {registrations.map((r) => (
               <tr key={r.id} className="admin-table-row">
-                <td><span className="admin-table-title">{r.name}</span></td>
-                <td>{r.email}</td>
-                <td>{r.country_code ?? '—'}</td>
-                <td className="admin-table-date">{new Date(r.registered_at).toLocaleDateString()}</td>
                 <td>
-                  <Badge variant={r.attended ? 'success' : 'default'}>
-                    {r.attended ? 'Yes' : 'No'}
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{r.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{r.email}</div>
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '0.85rem' }}>
+                  {r.phone_e164 ? (
+                    <span style={{ color: 'var(--color-text)' }}>{r.phone_e164}</span>
+                  ) : (
+                    <span style={{ color: 'var(--color-muted)' }}>—</span>
+                  )}
+                </td>
+                <td>{r.city || '—'} {r.country_code ? `(${r.country_code})` : ''}</td>
+                <td>
+                  <Badge variant={r.attended ? 'success' : 'default'} dot={Boolean(r.attended)}>
+                    {r.attended ? 'Attended' : 'Registered'}
                   </Badge>
                 </td>
+                <td className="admin-table-date">{new Date(r.registered_at).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>
