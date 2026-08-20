@@ -50,15 +50,25 @@ function TenantRow({ tenant }: { tenant: PlatformTenant }) {
       <td><Badge variant={STATUS_VARIANT[tenant.status] ?? 'default'}>{tenant.status}</Badge></td>
       <td className="admin-table-date">{new Date(tenant.created_at).toLocaleDateString()}</td>
       <td>
-        <Button
-          id={`status-${tenant.id}`}
-          variant="ghost"
-          size="sm"
-          loading={updateStatus.isPending}
-          onClick={toggle}
-        >
-          {tenant.status === 'active' ? 'Suspend' : tenant.status === 'suspended' ? 'Reactivate' : 'Activate'}
-        </Button>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <Button
+            id={`domains-${tenant.id}`}
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/platform/tenants/${tenant.id}`)}
+          >
+            🌐 Domains
+          </Button>
+          <Button
+            id={`status-${tenant.id}`}
+            variant="ghost"
+            size="sm"
+            loading={updateStatus.isPending}
+            onClick={toggle}
+          >
+            {tenant.status === 'active' ? 'Suspend' : tenant.status === 'suspended' ? 'Reactivate' : 'Activate'}
+          </Button>
+        </div>
       </td>
     </tr>
   )

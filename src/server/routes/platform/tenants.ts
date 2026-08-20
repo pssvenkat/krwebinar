@@ -24,6 +24,12 @@ import {
   getPlatformGlobalOverview,
   getPlatformAuditLogs,
   getPlatformSecurityIncidents,
+  listTenantDomains,
+  createTenantDomain,
+  getTenantDomainById,
+  verifyTenantDomain,
+  deleteTenantDomain,
+  listAllPlatformDomains,
 } from '../../lib/db'
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
@@ -128,6 +134,117 @@ app.put('/security-incidents/:id/status', async (c) => {
   const id = c.req.param('id')
   const body = (await c.req.json()) as { status: string }
   return c.json({ ok: true, data: { id, status: body.status, updated_at: new Date().toISOString() } })
+})
+
+// ── GET /domains (Platform-wide custom domains & subdomains) ──────
+
+app.get('/domains', async (c) => {
+  const domains = await listAllPlatformDomains(c.env.DB)
+  return c.json({ ok: true, data: { domains } })
+})
+
+// ── GET /tenants/:id/domains ──────────────────────────────────────
+
+app.get('/tenants/:id/domains', async (c) => {
+  const id = c.req.param('id')
+  const tenant = await getPlatformTenantById(c.env.DB, id)
+  if (!tenant) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404)
+  }
+
+  const domains = await listTenantDomains(c.env.DB, id)
+  return c.json({
+    ok: true,
+    data: {
+      domains,
+      instructions: {
+        cnameTarget: 'custom.krwebinar.com',
+        txtPrefix: '_krwebinar-challenge',
+      },
+    },
+  })
+})
+
+// ── POST /tenants/:id/domains ─────────────────────────────────────
+
+const createPlatformDomainSchema = z.object({
+  domain: z
+    .string()
+    .min(3)
+    .max(253)
+    .regex(
+      /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/,
+      'Must be a valid fully qualified domain or subdomain (e.g. webinar.mybrand.com or tenant.krwebinar.com)',
+    ),
+})
+
+app.post('/tenants/:id/domains', zValidator('json', createPlatformDomainSchema), async (c) => {
+  const id = c.req.param('id')
+  const tenant = await getPlatformTenantById(c.env.DB, id)
+  if (!tenant) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404)
+  }
+
+  const { domain } = c.req.valid('json')
+  const normalized = domain.toLowerCase().trim()
+
+  // Check if domain already exists for this tenant
+  const existing = await listTenantDomains(c.env.DB, id)
+  if (existing.some((d) => d.domain === normalized)) {
+    return c.json(
+      {
+        ok: false,
+        error: {
+          code: 'DOMAIN_EXISTS',
+          message: `Domain "${normalized}" is already assigned to this tenant.`,
+        },
+      },
+      409,
+    )
+  }
+
+  const created = await createTenantDomain(c.env.DB, id, normalized)
+  return c.json({ ok: true, data: { domain: created } }, 201)
+})
+
+// ── POST /tenants/:id/domains/:domainId/verify ────────────────────
+
+app.post('/tenants/:id/domains/:domainId/verify', async (c) => {
+  const id = c.req.param('id')
+  const domainId = c.req.param('domainId')
+
+  const tenant = await getPlatformTenantById(c.env.DB, id)
+  if (!tenant) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404)
+  }
+
+  const domain = await getTenantDomainById(c.env.DB, id, domainId)
+  if (!domain) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Domain mapping not found' } }, 404)
+  }
+
+  const result = await verifyTenantDomain(c.env.DB, id, domainId)
+  return c.json({ ok: true, data: result })
+})
+
+// ── DELETE /tenants/:id/domains/:domainId ─────────────────────────
+
+app.delete('/tenants/:id/domains/:domainId', async (c) => {
+  const id = c.req.param('id')
+  const domainId = c.req.param('domainId')
+
+  const tenant = await getPlatformTenantById(c.env.DB, id)
+  if (!tenant) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404)
+  }
+
+  const domain = await getTenantDomainById(c.env.DB, id, domainId)
+  if (!domain) {
+    return c.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Domain mapping not found' } }, 404)
+  }
+
+  const deleted = await deleteTenantDomain(c.env.DB, id, domainId)
+  return c.json({ ok: true, data: { deleted } })
 })
 
 export { app as platformRoutes }

@@ -82,7 +82,6 @@ export default function AdminLayout() {
             <AdminNavLink to="/admin/users">👥 Team & Users</AdminNavLink>
             <AdminNavLink to="/admin/profile">🏢 Business Profile</AdminNavLink>
             <AdminNavLink to="/admin/branding">🎨 Branding</AdminNavLink>
-            <AdminNavLink to="/admin/domains">🌐 Custom Domains</AdminNavLink>
             <AdminNavLink to="/admin/privacy">🔒 Privacy & DPDP</AdminNavLink>
           </NavGroup>
         </nav>

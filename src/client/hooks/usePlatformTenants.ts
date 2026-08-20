@@ -93,3 +93,84 @@ export function useUpdateTenantStatus() {
     },
   })
 }
+
+// ── Domain Management Hooks (Platform Admin) ─────────────────────
+
+export interface PlatformTenantDomain {
+  id: string
+  tenant_id: string
+  domain: string
+  status: 'pending' | 'active' | 'failed'
+  ssl_status: 'pending' | 'active' | 'failed'
+  verification_token: string
+  cname_target: string
+  created_at: string
+  updated_at: string
+  tenant_name?: string
+  tenant_slug?: string
+}
+
+export function usePlatformTenantDomains(tenantId: string | undefined) {
+  return useQuery({
+    queryKey: ['platform', 'tenants', tenantId, 'domains'],
+    queryFn: () =>
+      platformFetch<{
+        domains: PlatformTenantDomain[]
+        instructions: { cnameTarget: string; txtPrefix: string }
+      }>(`/api/platform/tenants/${tenantId}/domains`),
+    enabled: !!tenantId,
+    staleTime: 15_000,
+  })
+}
+
+export function useAllPlatformDomains() {
+  return useQuery({
+    queryKey: ['platform', 'domains'],
+    queryFn: () => platformFetch<{ domains: PlatformTenantDomain[] }>('/api/platform/domains'),
+    staleTime: 15_000,
+  })
+}
+
+export function useCreatePlatformTenantDomain(tenantId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (domain: string) =>
+      platformFetch<{ domain: PlatformTenantDomain }>(`/api/platform/tenants/${tenantId}/domains`, {
+        method: 'POST',
+        body: JSON.stringify({ domain }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform', 'tenants', tenantId, 'domains'] })
+      qc.invalidateQueries({ queryKey: ['platform', 'domains'] })
+    },
+  })
+}
+
+export function useVerifyPlatformTenantDomain(tenantId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (domainId: string) =>
+      platformFetch<{ verified: boolean; domain: PlatformTenantDomain }>(
+        `/api/platform/tenants/${tenantId}/domains/${domainId}/verify`,
+        { method: 'POST' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform', 'tenants', tenantId, 'domains'] })
+      qc.invalidateQueries({ queryKey: ['platform', 'domains'] })
+    },
+  })
+}
+
+export function useDeletePlatformTenantDomain(tenantId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (domainId: string) =>
+      platformFetch<{ deleted: boolean }>(`/api/platform/tenants/${tenantId}/domains/${domainId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform', 'tenants', tenantId, 'domains'] })
+      qc.invalidateQueries({ queryKey: ['platform', 'domains'] })
+    },
+  })
+}

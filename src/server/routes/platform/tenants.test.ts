@@ -22,13 +22,17 @@ vi.mock('../../middleware/auth', () => ({
   requireRole: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
-// ── Mock DB ───────────────────────────────────────────────────────
-
 const mockListPlatformTenants    = vi.fn()
 const mockCreatePlatformTenant   = vi.fn()
 const mockGetPlatformTenantById  = vi.fn()
 const mockUpdatePlatformTenantStatus = vi.fn()
 const mockGetPlatformTenantStats = vi.fn()
+const mockListTenantDomains      = vi.fn()
+const mockCreateTenantDomain     = vi.fn()
+const mockGetTenantDomainById    = vi.fn()
+const mockVerifyTenantDomain     = vi.fn()
+const mockDeleteTenantDomain     = vi.fn()
+const mockListAllPlatformDomains = vi.fn()
 
 vi.mock('../../lib/db', () => ({
   listPlatformTenants:          (...a: unknown[]) => mockListPlatformTenants(...a),
@@ -36,6 +40,15 @@ vi.mock('../../lib/db', () => ({
   getPlatformTenantById:        (...a: unknown[]) => mockGetPlatformTenantById(...a),
   updatePlatformTenantStatus:   (...a: unknown[]) => mockUpdatePlatformTenantStatus(...a),
   getPlatformTenantStats:       (...a: unknown[]) => mockGetPlatformTenantStats(...a),
+  listTenantDomains:            (...a: unknown[]) => mockListTenantDomains(...a),
+  createTenantDomain:           (...a: unknown[]) => mockCreateTenantDomain(...a),
+  getTenantDomainById:          (...a: unknown[]) => mockGetTenantDomainById(...a),
+  verifyTenantDomain:           (...a: unknown[]) => mockVerifyTenantDomain(...a),
+  deleteTenantDomain:           (...a: unknown[]) => mockDeleteTenantDomain(...a),
+  listAllPlatformDomains:       (...a: unknown[]) => mockListAllPlatformDomains(...a),
+  getPlatformGlobalOverview:    vi.fn().mockResolvedValue({ totalTenants: 1, totalWebinars: 3, totalUsers: 2, totalRegistrations: 47, quota: { workerRequests: { current: 100, limit: 100000, percentage: 0.1 }, d1Writes: { current: 10, limit: 100000, percentage: 0.01 }, d1Reads: { current: 50, limit: 5000000, percentage: 0.001 }, degradedMode: false } }),
+  getPlatformAuditLogs:         vi.fn().mockReturnValue([]),
+  getPlatformSecurityIncidents: vi.fn().mockReturnValue([]),
 }))
 
 // ── Fixtures ──────────────────────────────────────────────────────
@@ -147,5 +160,97 @@ describe('Platform tenant routes', () => {
     expect(json.ok).toBe(true)
     expect(json.data.tenant.status).toBe('active')
     expect(mockUpdatePlatformTenantStatus).toHaveBeenCalledWith(MOCK_ENV.DB, 'tenant-1', 'active')
+  })
+
+  // ── GET /tenants/:id/domains ─────────────────────────────────
+
+  it('GET /api/platform/tenants/:id/domains returns tenant domains and instructions', async () => {
+    const mockDomain = {
+      id: 'dom-1',
+      tenant_id: 'tenant-1',
+      domain: 'webinar.kravefoods.in',
+      status: 'active',
+      ssl_status: 'active',
+      verification_token: 'token-123',
+      cname_target: 'custom.krwebinar.com',
+      created_at: '2025-01-01',
+      updated_at: '2025-01-01',
+    }
+    mockListTenantDomains.mockResolvedValueOnce([mockDomain])
+
+    const res = await app.fetch(new Request('http://localhost/api/platform/tenants/tenant-1/domains'), MOCK_ENV)
+    expect(res.status).toBe(200)
+    const json = await res.json() as { ok: boolean; data: { domains: any[]; instructions: any } }
+    expect(json.ok).toBe(true)
+    expect(json.data.domains).toHaveLength(1)
+    expect(json.data.domains[0].domain).toBe('webinar.kravefoods.in')
+  })
+
+  // ── POST /tenants/:id/domains ────────────────────────────────
+
+  it('POST /api/platform/tenants/:id/domains creates domain or subdomain', async () => {
+    mockListTenantDomains.mockResolvedValueOnce([])
+    const createdDomain = {
+      id: 'dom-2',
+      tenant_id: 'tenant-1',
+      domain: 'krave.krwebinar.com',
+      status: 'pending',
+      ssl_status: 'pending',
+    }
+    mockCreateTenantDomain.mockResolvedValueOnce(createdDomain)
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/platform/tenants/tenant-1/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'krave.krwebinar.com' }),
+      }),
+      MOCK_ENV,
+    )
+    expect(res.status).toBe(201)
+    const json = await res.json() as { ok: boolean; data: { domain: any } }
+    expect(json.ok).toBe(true)
+    expect(json.data.domain.domain).toBe('krave.krwebinar.com')
+  })
+
+  // ── POST /tenants/:id/domains/:domainId/verify ───────────────
+
+  it('POST /api/platform/tenants/:id/domains/:domainId/verify triggers verification', async () => {
+    const existingDomain = { id: 'dom-1', tenant_id: 'tenant-1', domain: 'webinar.kravefoods.in' }
+    mockGetTenantDomainById.mockResolvedValueOnce(existingDomain)
+    mockVerifyTenantDomain.mockResolvedValueOnce({
+      verified: true,
+      domain: { ...existingDomain, status: 'active', ssl_status: 'active' },
+    })
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/platform/tenants/tenant-1/domains/dom-1/verify', {
+        method: 'POST',
+      }),
+      MOCK_ENV,
+    )
+    expect(res.status).toBe(200)
+    const json = await res.json() as { ok: boolean; data: { verified: boolean } }
+    expect(json.ok).toBe(true)
+    expect(json.data.verified).toBe(true)
+  })
+
+  // ── DELETE /tenants/:id/domains/:domainId ────────────────────
+
+  it('DELETE /api/platform/tenants/:id/domains/:domainId removes domain', async () => {
+    const existingDomain = { id: 'dom-1', tenant_id: 'tenant-1', domain: 'webinar.kravefoods.in' }
+    mockGetTenantDomainById.mockResolvedValueOnce(existingDomain)
+    mockDeleteTenantDomain.mockResolvedValueOnce(true)
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/platform/tenants/tenant-1/domains/dom-1', {
+        method: 'DELETE',
+      }),
+      MOCK_ENV,
+    )
+    expect(res.status).toBe(200)
+    const json = await res.json() as { ok: boolean; data: { deleted: boolean } }
+    expect(json.ok).toBe(true)
+    expect(json.data.deleted).toBe(true)
   })
 })
