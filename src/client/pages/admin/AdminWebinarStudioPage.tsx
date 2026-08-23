@@ -438,22 +438,25 @@ export default function AdminWebinarStudioPage() {
     <div className="admin-studio-container" style={{ minHeight: '100vh', background: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* ── Studio Top Broadcast Bar ── */}
       <header
+        className="admin-studio-header"
         style={{
           background: '#1e293b',
           borderBottom: '1px solid #334155',
-          padding: '0.75rem 1.5rem',
+          padding: '0.75rem 1.25rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <Link to={`/admin/webinars/${id}`} style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.85rem' }}>
-            ← Back to Overview
+            ← Overview
           </Link>
           <div style={{ height: '1.2rem', width: '1px', background: '#334155' }} />
-          <h1 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: '#fff' }}>
-            🎙️ Host Studio: {webinar.title}
+          <h1 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: '#fff' }}>
+            🎙️ Studio: {webinar.title}
           </h1>
           {isLive ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#dc2626', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -464,12 +467,12 @@ export default function AdminWebinarStudioPage() {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.85rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            👥 {viewerCount} Live Viewers
+            👥 {viewerCount} Live
           </span>
           <span style={{ fontSize: '0.85rem', color: readyState === 'OPEN' ? '#4ade80' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            ● {readyState === 'OPEN' ? 'Live Synced' : 'Connecting WS…'}
+            ● {readyState === 'OPEN' ? 'Live Synced' : 'Connecting…'}
           </span>
           {isLive ? (
             <Button
@@ -494,9 +497,9 @@ export default function AdminWebinarStudioPage() {
       </header>
 
       {/* ── Main Studio Grid Layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', flex: 1, overflow: 'hidden' }}>
+      <div className="admin-studio-grid">
         {/* ── Left Column: Broadcast Monitor & Stage Controls ── */}
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }}>
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }}>
           {/* Stream Player Area */}
           <div
             style={{

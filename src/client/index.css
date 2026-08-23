@@ -260,3 +260,31 @@ button, input, select, textarea { font-family: inherit; }
   animation: shimmer 1.5s infinite;
   border-radius: var(--radius-sm);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   MOBILE ACCESSIBILITY & INPUT OPTIMIZATIONS
+   ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Prevent iOS automatic zoom on form input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Ensure touch targets are comfortable on small screens */
+  button,
+  .btn,
+  .admin-tab,
+  .admin-tab-btn,
+  .platform-nav-link {
+    min-height: 42px;
+    touch-action: manipulation;
+  }
+}

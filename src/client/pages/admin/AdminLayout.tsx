@@ -1,88 +1,87 @@
-import React from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useBranding } from '../../hooks/useBranding'
+import { useAuthContext } from '../../contexts/AuthContext'
+import { Button } from '../../components/ui/Button'
 
 /**
  * Admin Layout
  *
  * Shell for all /admin/* routes.
- * Phase 1: Minimal sidebar + header.
- * Phase 3+: Full RBAC-aware navigation.
- * Phase 5+: Vendor-branded header.
+ * Fully responsive: desktop sidebar + mobile slide-out drawer with hamburger navigation.
  */
 export default function AdminLayout() {
   const { data: branding } = useBranding()
+  const { user, logout } = useAuthContext()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Close mobile drawer on navigation
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
+
+  // Prevent background scrolling when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileOpen])
+
+  const handleSignOut = async () => {
+    await logout()
+    navigate('/admin/login', { replace: true })
+  }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-background)' }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          width: 240,
-          background: 'var(--color-surface)',
-          borderRight: '1.5px solid var(--color-border)',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          flexShrink: 0,
-        }}
-      >
-        {/* Logo */}
+    <div className="admin-layout-shell">
+      {/* Mobile Backdrop Overlay */}
+      {mobileOpen && (
         <div
-          style={{
-            padding: 'var(--space-4) var(--space-5)',
-            borderBottom: '1.5px solid var(--color-border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-3)',
-            minHeight: '64px',
-          }}
-        >
-          {branding?.logoUrl ? (
-            <img
-              src={branding.logoUrl}
-              alt={branding.platformName || 'Brand Logo'}
-              style={{
-                maxHeight: 38,
-                maxWidth: 160,
-                objectFit: 'contain',
-              }}
-            />
-          ) : (
-            <>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  color: '#ffffff',
-                }}
-              >
-                🌱
-              </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-heading)',
-                  fontWeight: 800,
-                  fontSize: 'var(--text-base)',
-                  color: 'var(--color-primary)',
-                }}
-              >
-                {branding?.platformName || 'Admin'}
-              </div>
-            </>
-          )}
+          className="admin-mobile-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar Drawer */}
+      <aside className={`admin-sidebar ${mobileOpen ? 'admin-sidebar--open' : ''}`}>
+        {/* Logo & Close Button */}
+        <div className="admin-sidebar-brand">
+          <div className="admin-sidebar-logo-wrap">
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.platformName || 'Brand Logo'}
+                className="admin-sidebar-logo-img"
+              />
+            ) : (
+              <>
+                <div className="admin-sidebar-logo-fallback">🌱</div>
+                <div className="admin-sidebar-brand-name">
+                  {branding?.platformName || 'Admin'}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            className="admin-mobile-close-btn"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav style={{ flex: 1, padding: 'var(--space-4)' }}>
+        {/* Navigation Groups */}
+        <nav className="admin-sidebar-nav">
           <NavGroup label="Overview">
             <AdminNavLink to="/admin" end>
               📊 Dashboard
@@ -105,79 +104,67 @@ export default function AdminLayout() {
           </NavGroup>
         </nav>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: 'var(--space-4) var(--space-6)',
-            borderTop: '1.5px solid var(--color-border)',
-            fontSize: 'var(--text-xs)',
-            color: 'var(--color-muted)',
-          }}
-        >
-          Phase 1 — Foundation
+        {/* User Account Footer */}
+        <div className="admin-sidebar-footer">
+          <div className="admin-sidebar-user-info">
+            <div className="admin-sidebar-user-status">
+              <span className="admin-status-dot" />
+              <span className="admin-sidebar-user-role">{user?.role || 'VENDOR ADMIN'}</span>
+            </div>
+            <div className="admin-sidebar-user-email">{user?.email || 'admin@kravemicrogreens.in'}</div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={handleSignOut}
+          >
+            Sign Out
+          </Button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        {/* Top bar */}
-        <header
-          style={{
-            background: 'var(--color-surface)',
-            borderBottom: '1.5px solid var(--color-border)',
-            padding: 'var(--space-4) var(--space-6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'sticky',
-            top: 0,
-            zIndex: 'var(--z-sticky)',
-          }}
-        >
-          <span
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 700,
-              color: 'var(--color-text)',
-            }}
-          >
-            Vendor Admin
-          </span>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-muted)',
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 'var(--space-1)',
-              }}
+      {/* Main Container */}
+      <div className="admin-main-wrapper">
+        {/* Top Header Bar */}
+        <header className="admin-topbar">
+          <div className="admin-topbar-left">
+            <button
+              type="button"
+              className="admin-hamburger-btn"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation menu"
             >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: 'var(--color-success)',
-                  display: 'inline-block',
-                }}
-              />
-              Demo Vendor
-            </span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <span className="admin-topbar-title">Vendor Admin</span>
+          </div>
+
+          <div className="admin-topbar-right">
+            <div className="admin-topbar-user">
+              <span className="admin-status-dot" />
+              <span className="admin-topbar-user-email">{user?.email || 'admin'}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="admin-topbar-signout"
+              onClick={handleSignOut}
+            >
+              Sign Out
+            </Button>
           </div>
         </header>
 
-        {/* Page content */}
-        <div style={{ padding: 'var(--space-8) var(--space-6)' }}>
+        {/* Page Content */}
+        <main className="admin-content-area">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
@@ -186,20 +173,8 @@ export default function AdminLayout() {
 
 function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 'var(--space-5)' }}>
-      <div
-        style={{
-          fontSize: 'var(--text-xs)',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          color: 'var(--color-placeholder)',
-          paddingLeft: 'var(--space-3)',
-          marginBottom: 'var(--space-2)',
-        }}
-      >
-        {label}
-      </div>
+    <div className="admin-nav-group">
+      <div className="admin-nav-group-label">{label}</div>
       {children}
     </div>
   )
@@ -218,20 +193,9 @@ function AdminNavLink({
     <NavLink
       to={to}
       end={end}
-      style={({ isActive }) => ({
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--space-2)',
-        padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 'var(--text-sm)',
-        fontWeight: isActive ? 600 : 400,
-        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-        background: isActive ? 'var(--color-primary-light)' : 'transparent',
-        textDecoration: 'none',
-        marginBottom: 2,
-        transition: 'background var(--transition-fast), color var(--transition-fast)',
-      })}
+      className={({ isActive }) =>
+        `admin-nav-link ${isActive ? 'admin-nav-link--active' : ''}`
+      }
     >
       {children}
     </NavLink>

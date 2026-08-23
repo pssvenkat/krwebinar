@@ -1410,14 +1410,45 @@
 /* ── Responsive: stack layout on mobile ───────────────────────── */
 
 @media (max-width: 767px) {
-  .attend-chat-sidebar {
+  .attend-header-inner {
+    padding: 0.6rem 0.85rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .attend-webinar-name {
+    max-width: 220px;
+    font-size: 0.875rem;
+  }
+
+  .attend-stream-meta {
+    padding: 0.875rem 1rem;
+  }
+
+  .attend-chat-sidebar,
+  .attend-chat-section {
     border-left: none;
     border-top: 1px solid var(--color-border);
-    max-height: 40vh;
+    min-height: 380px;
+    max-height: 60vh;
+  }
+
+  .attend-chat-input {
+    font-size: 16px;
   }
 
   .attend-host-controls {
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  .cal-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cal-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
