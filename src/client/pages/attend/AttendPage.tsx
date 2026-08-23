@@ -392,6 +392,499 @@ function QnAPanel({
   )
 }
 
+// ── Countdown Hook & Calendar Helpers ─────────────────────────────
+
+function useCountdown(targetDateStr: string | null, targetTimeStr: string | null) {
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number
+    hours: number
+    minutes: number
+    seconds: number
+    isPassed: boolean
+  }>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isPassed: false,
+  })
+
+  useEffect(() => {
+    if (!targetDateStr) return
+
+    const update = () => {
+      const timePart = targetTimeStr ? `${targetTimeStr}:00` : '00:00:00'
+      const targetTime = new Date(`${targetDateStr}T${timePart}`).getTime()
+      const now = Date.now()
+      const diff = targetTime - now
+
+      if (isNaN(targetTime) || diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: true })
+        return
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+      setTimeLeft({ days, hours, minutes, seconds, isPassed: false })
+    }
+
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [targetDateStr, targetTimeStr])
+
+  return timeLeft
+}
+
+function downloadIcsFile(webinar: {
+  title: string
+  description?: string | null
+  startDate: string
+  startTime: string
+  endTime: string
+}) {
+  const startClean = `${webinar.startDate.replace(/-/g, '')}T${(webinar.startTime || '00:00').replace(':', '')}00`
+  const endClean = `${webinar.startDate.replace(/-/g, '')}T${(webinar.endTime || '01:00').replace(':', '')}00`
+
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//WebinarPlatform//Webinar Event//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `SUMMARY:${webinar.title.replace(/\n/g, ' ')}`,
+    `DESCRIPTION:${(webinar.description || webinar.title).replace(/\n/g, ' ')}`,
+    `DTSTART:${startClean}`,
+    `DTEND:${endClean}`,
+    `STATUS:CONFIRMED`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', `${webinar.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function getGoogleCalendarUrl(webinar: {
+  title: string
+  description?: string | null
+  startDate: string
+  startTime: string
+  endTime: string
+}) {
+  const startClean = `${webinar.startDate.replace(/-/g, '')}T${(webinar.startTime || '00:00').replace(':', '')}00`
+  const endClean = `${webinar.startDate.replace(/-/g, '')}T${(webinar.endTime || '01:00').replace(':', '')}00`
+  const title = encodeURIComponent(webinar.title)
+  const details = encodeURIComponent(webinar.description || `Live Webinar: ${webinar.title}`)
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startClean}/${endClean}&details=${details}`
+}
+
+// ── Screen: Webinar Not Started Yet ───────────────────────────────
+
+function WebinarNotStartedScreen({
+  webinar,
+  branding,
+  targetWebinarId,
+  onRefresh,
+  isRefreshing,
+}: {
+  webinar: AttendData['webinar']
+  branding: any
+  targetWebinarId: string
+  onRefresh: () => void
+  isRefreshing: boolean
+}) {
+  const countdown = useCountdown(webinar.startDate, webinar.startTime)
+
+  const formattedDate = webinar.startDate
+    ? new Date(`${webinar.startDate}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Scheduled Date TBA'
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#090d16',
+        padding: '1.5rem',
+        color: '#f8fafc',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '540px',
+          width: '100%',
+          background: '#111827',
+          borderRadius: '16px',
+          padding: '2.5rem 2rem',
+          border: '1px solid #1f2937',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          textAlign: 'center',
+        }}
+      >
+        {/* Logo / Icon */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.platformName || 'Logo'}
+              style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain', marginBottom: '0.75rem' }}
+            />
+          ) : (
+            <span style={{ fontSize: '2.75rem', display: 'block', marginBottom: '0.5rem' }}>⏳</span>
+          )}
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#f59e0b',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              display: 'inline-block',
+            }}
+          >
+            🟡 Webinar Not Started Yet
+          </span>
+        </div>
+
+        {/* Title & Host */}
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, margin: '0.5rem 0 0.4rem', color: '#ffffff', lineHeight: 1.3 }}>
+          {webinar.title}
+        </h1>
+        {webinar.hostName && (
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#9ca3af' }}>
+            Hosted by <strong style={{ color: '#e5e7eb' }}>{webinar.hostName}</strong>
+          </p>
+        )}
+
+        {/* Schedule Badge Card */}
+        <div
+          style={{
+            background: '#1f2937',
+            borderRadius: '12px',
+            padding: '1rem 1.25rem',
+            border: '1px solid #374151',
+            marginBottom: '1.5rem',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>📅</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f3f4f6' }}>{formattedDate}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⏰</span>
+            <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
+              {webinar.startTime ? `${webinar.startTime} – ${webinar.endTime || ''}` : 'Time TBA'} ({webinar.timezone || 'IST'})
+            </span>
+          </div>
+        </div>
+
+        {/* Countdown Timer */}
+        <div style={{ marginBottom: '1.75rem' }}>
+          <p style={{ fontSize: '0.8rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.75rem', fontWeight: 600 }}>
+            {countdown.isPassed ? 'Broadcasting soon' : 'Time Remaining Until Live'}
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+            {[
+              { label: 'Days', val: countdown.days },
+              { label: 'Hours', val: countdown.hours },
+              { label: 'Mins', val: countdown.minutes },
+              { label: 'Secs', val: countdown.seconds },
+            ].map((unit) => (
+              <div
+                key={unit.label}
+                style={{
+                  background: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: '10px',
+                  padding: '0.75rem 0.25rem',
+                }}
+              >
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#38bdf8', lineHeight: 1 }}>
+                  {String(unit.val).padStart(2, '0')}
+                </div>
+                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginTop: '0.35rem', fontWeight: 600 }}>
+                  {unit.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Live Auto-Detection Note */}
+        <div
+          style={{
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.2)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+            fontSize: '0.825rem',
+            color: '#bae6fd',
+            marginBottom: '1.5rem',
+            lineHeight: 1.45,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            textAlign: 'left',
+          }}
+        >
+          <span style={{ fontSize: '1.25rem', animation: 'pulse 2s infinite' }}>📡</span>
+          <span>
+            {countdown.isPassed
+              ? 'The scheduled start time has arrived! As soon as the host starts the stream, this room will open automatically.'
+              : 'Please keep this tab open. You will be automatically admitted to the login & live stream as soon as the host goes live!'}
+          </span>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            style={{ width: '100%', padding: '0.75rem' }}
+          >
+            {isRefreshing ? 'Checking Live Status…' : '🔄 Check Status Now'}
+          </Button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <a
+              href={getGoogleCalendarUrl(webinar)}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0.6rem 0.5rem',
+                background: '#1f2937',
+                border: '1px solid #374151',
+                borderRadius: '8px',
+                color: '#e5e7eb',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              📅 Google Cal
+            </a>
+            <button
+              type="button"
+              onClick={() => downloadIcsFile(webinar)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0.6rem 0.5rem',
+                background: '#1f2937',
+                border: '1px solid #374151',
+                borderRadius: '8px',
+                color: '#e5e7eb',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              📥 Outlook / iCal
+            </button>
+          </div>
+        </div>
+
+        {/* Not registered link */}
+        <div style={{ marginTop: '1.5rem', borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
+          <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Haven't registered yet? </span>
+          <Link
+            to={`/register/${targetWebinarId}`}
+            style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'underline' }}
+          >
+            Register now
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Screen: Webinar Ended ─────────────────────────────────────────
+
+function WebinarEndedScreen({
+  webinar,
+  branding,
+  token,
+  targetWebinarId,
+}: {
+  webinar: AttendData['webinar']
+  branding: any
+  token: string
+  targetWebinarId: string
+}) {
+  const formattedDate = webinar.startDate
+    ? new Date(`${webinar.startDate}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : ''
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#090d16',
+        padding: '1.5rem',
+        color: '#f8fafc',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '500px',
+          width: '100%',
+          background: '#111827',
+          borderRadius: '16px',
+          padding: '2.5rem 2rem',
+          border: '1px solid #1f2937',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          textAlign: 'center',
+        }}
+      >
+        {/* Logo / Icon */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.platformName || 'Logo'}
+              style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain', marginBottom: '0.75rem' }}
+            />
+          ) : (
+            <span style={{ fontSize: '2.75rem', display: 'block', marginBottom: '0.5rem' }}>🏁</span>
+          )}
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#94a3b8',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              background: 'rgba(148, 163, 184, 0.12)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              display: 'inline-block',
+            }}
+          >
+            ⚪ Webinar Concluded
+          </span>
+        </div>
+
+        {/* Title */}
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, margin: '0.5rem 0 0.4rem', color: '#ffffff', lineHeight: 1.3 }}>
+          {webinar.title}
+        </h1>
+        {webinar.hostName && (
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#9ca3af' }}>
+            Hosted by <strong style={{ color: '#e5e7eb' }}>{webinar.hostName}</strong>
+          </p>
+        )}
+
+        {/* Ended Message */}
+        <div
+          style={{
+            background: '#1f2937',
+            borderRadius: '12px',
+            padding: '1.25rem',
+            border: '1px solid #374151',
+            marginBottom: '1.75rem',
+            color: '#e5e7eb',
+            fontSize: '0.9rem',
+            lineHeight: 1.5,
+          }}
+        >
+          <p style={{ margin: 0 }}>
+            This live webinar session has ended{formattedDate ? ` (${formattedDate})` : ''}.
+          </p>
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.825rem', color: '#9ca3af' }}>
+            Thank you for attending! If you have questions or would like to share your thoughts, please submit your feedback below.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <Link
+            to={`/w/${token}/feedback`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1.25rem',
+              background: '#2563eb',
+              color: '#ffffff',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            ⭐ Share Feedback & Enquire →
+          </Link>
+
+          <Link
+            to={`/register/${targetWebinarId}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.65rem 1.25rem',
+              background: '#1f2937',
+              border: '1px solid #374151',
+              color: '#9ca3af',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            View Webinar Details
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main AttendPage ───────────────────────────────────────────────
 
 export default function AttendPage() {
@@ -432,7 +925,7 @@ export default function AttendPage() {
   const [isVerifyingPhone, setIsVerifyingPhone] = useState(false)
 
   // Initial HTTP fetch — validates token, gets webinar state
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['attend', token],
     queryFn: async (): Promise<AttendData> => {
       const r = await fetch(`/api/v1/attend/${token}`, {
@@ -444,7 +937,15 @@ export default function AttendPage() {
       return json.data
     },
     enabled: !!token,
-    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const w = query.state.data?.webinar
+      // Auto-poll every 5s if webinar is not live and not ended, so attendee gets instant entry when host goes live!
+      if (w && !w.isLive && !w.isEnded) {
+        return 5_000
+      }
+      return false
+    },
+    staleTime: 5_000,
   })
 
   // Check if phone was already validated for this specific webinar ID
@@ -780,12 +1281,46 @@ export default function AttendPage() {
   const webinar = data?.webinar ?? {
     id: token ?? '',
     title: 'Webinar',
+    description: null,
     hostName: 'Host',
     youtubeVideoId: 'dQw4w9WgXcQ',
+    startDate: '',
+    startTime: '',
+    endTime: '',
+    timezone: 'IST',
+    status: 'PUBLISHED',
+    isLive: false,
+    isEnded: false,
   }
 
   const targetWebinarId = webinar.id || token || ''
 
+  // 1. If the webinar has ENDED — show Webinar Concluded Page
+  if (webinar.isEnded || webinar.status === 'ENDED') {
+    return (
+      <WebinarEndedScreen
+        webinar={webinar as any}
+        branding={branding}
+        token={token || ''}
+        targetWebinarId={targetWebinarId}
+      />
+    )
+  }
+
+  // 2. If the webinar has NOT STARTED YET — show Waiting Room & Countdown Screen
+  if (!webinar.isLive && webinar.status !== 'LIVE') {
+    return (
+      <WebinarNotStartedScreen
+        webinar={webinar as any}
+        branding={branding}
+        targetWebinarId={targetWebinarId}
+        onRefresh={() => refetch()}
+        isRefreshing={isFetching}
+      />
+    )
+  }
+
+  // 3. If the webinar IS LIVE — require attendee phone verification before joining stream
   if (!isPhoneVerified) {
     return (
       <div
