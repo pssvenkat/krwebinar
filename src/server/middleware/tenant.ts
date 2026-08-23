@@ -18,7 +18,7 @@ import { findTenantBySlug, findTenantByDomain } from '../lib/db'
 import type { Env, HonoVariables, TenantContext } from '../types'
 
 /** Routes that bypass tenant resolution */
-const PUBLIC_BYPASS = ['/api/health', '/api/platform']
+const PUBLIC_BYPASS = ['/api/health', '/api/platform', '/api/v1/platform']
 
 export function tenantMiddleware(): MiddlewareHandler<{ Bindings: Env; Variables: HonoVariables }> {
   return async (c, next) => {

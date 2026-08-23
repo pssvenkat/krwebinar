@@ -93,6 +93,8 @@ app.route('/api/v1/admin/users', adminUserRoutes)
 // Platform admin (PLATFORM_OWNER only — no tenant middleware)
 app.route('/api/platform', platformRoutes)
 app.route('/api/platform/users', platformUserRoutes)
+app.route('/api/v1/platform', platformRoutes)
+app.route('/api/v1/platform/users', platformUserRoutes)
 
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)
