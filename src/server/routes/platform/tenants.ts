@@ -30,6 +30,7 @@ import {
   verifyTenantDomain,
   deleteTenantDomain,
   listAllPlatformDomains,
+  setPlatformMetricsReset,
 } from '../../lib/db'
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
@@ -112,6 +113,13 @@ app.put('/tenants/:id', zValidator('json', updateTenantSchema), async (c) => {
 app.get('/metrics', async (c) => {
   const overview = await getPlatformGlobalOverview(c.env.DB)
   return c.json({ ok: true, data: overview })
+})
+
+// ── POST /metrics/reset — Reset daily quota counters ──────────────
+app.post('/metrics/reset', async (c) => {
+  const result = setPlatformMetricsReset()
+  const overview = await getPlatformGlobalOverview(c.env.DB)
+  return c.json({ ok: true, data: { message: 'Daily quota counters reset successfully', ...result, overview } })
 })
 
 // ── GET /audit-logs (Module 4: DPDP Masked Audit Trail) ───────────

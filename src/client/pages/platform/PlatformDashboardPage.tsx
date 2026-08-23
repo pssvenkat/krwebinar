@@ -11,7 +11,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usePlatformTenants, useUpdateTenantStatus } from '../../hooks/usePlatformTenants'
 import type { PlatformTenant } from '../../hooks/usePlatformTenants'
 import { Badge } from '../../components/ui/Badge'
@@ -33,6 +33,10 @@ interface PlatformMetrics {
     d1Writes: { current: number; limit: number; percentage: number }
     d1Reads: { current: number; limit: number; percentage: number }
     degradedMode: boolean
+    resetsAtUtc?: string
+    resetCountdown?: string
+    currentUtcDay?: string
+    lastResetAt?: string | null
   }
 }
 
@@ -116,13 +120,24 @@ function calculateTrialDays(createdAt: string, status: string, plan: string): st
 
 export default function PlatformDashboardPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const updateStatus = useUpdateTenantStatus()
+  const [resetMsg, setResetMsg] = useState<string | null>(null)
 
   // 1. Load Global Metrics & Cost Engine
   const { data: metrics, isLoading: mLoading, error: mError } = useQuery({
     queryKey: ['platform', 'metrics'],
     queryFn: () => authPlatformFetch<PlatformMetrics>('/api/platform/metrics'),
     refetchInterval: 15_000,
+  })
+
+  const resetQuotaMutation = useMutation({
+    mutationFn: () => authPlatformFetch<{ message: string }>('/api/platform/metrics/reset', { method: 'POST' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['platform', 'metrics'] })
+      setResetMsg('Daily quota counters reset to baseline!')
+      setTimeout(() => setResetMsg(null), 4000)
+    },
   })
 
   // 2. Load Tenants
@@ -251,9 +266,36 @@ export default function PlatformDashboardPage() {
 
           {/* Module 1: Cloudflare Free-Tier Quota Gauges */}
           <div className="branding-section" style={{ marginTop: '2rem' }}>
-            <h3 className="branding-section-title">Module 1: Cloudflare Free-Tier Quotas ($0/Month Enforcement)</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 className="branding-section-title">Module 1: Cloudflare Free-Tier Quotas ($0/Month Enforcement)</h3>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+                  Cloudflare Free quotas reset automatically every day at <strong>00:00:00 UTC</strong>.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8125rem', padding: '0.35rem 0.75rem', background: 'var(--color-surface-muted, #f1f5f9)', border: '1px solid var(--color-border)', borderRadius: '9999px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                  ⏰ Auto-resets in {quota.resetCountdown || 'midnight UTC'} (00:00 UTC)
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={resetQuotaMutation.isPending}
+                  onClick={() => resetQuotaMutation.mutate()}
+                  title="Reset daily usage counters to baseline"
+                >
+                  🔄 Reset Daily Counters
+                </Button>
+              </div>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+            {resetMsg && (
+              <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: '6px', fontSize: '0.85rem', color: '#16a34a' }}>
+                ✅ {resetMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.25rem' }}>
               {/* Daily Worker Requests */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>

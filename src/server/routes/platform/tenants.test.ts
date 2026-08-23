@@ -46,6 +46,7 @@ vi.mock('../../lib/db', () => ({
   verifyTenantDomain:           (...a: unknown[]) => mockVerifyTenantDomain(...a),
   deleteTenantDomain:           (...a: unknown[]) => mockDeleteTenantDomain(...a),
   listAllPlatformDomains:       (...a: unknown[]) => mockListAllPlatformDomains(...a),
+  setPlatformMetricsReset:      vi.fn().mockReturnValue({ resetAt: '2026-08-23T00:00:00.000Z' }),
   getPlatformGlobalOverview:    vi.fn().mockResolvedValue({ totalTenants: 1, totalWebinars: 3, totalUsers: 2, totalRegistrations: 47, quota: { workerRequests: { current: 100, limit: 100000, percentage: 0.1 }, d1Writes: { current: 10, limit: 100000, percentage: 0.01 }, d1Reads: { current: 50, limit: 5000000, percentage: 0.001 }, degradedMode: false } }),
   getPlatformAuditLogs:         vi.fn().mockReturnValue([]),
   getPlatformSecurityIncidents: vi.fn().mockReturnValue([]),
