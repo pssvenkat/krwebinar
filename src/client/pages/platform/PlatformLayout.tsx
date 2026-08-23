@@ -54,8 +54,10 @@ export default function PlatformLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span className="platform-sidebar-logo">🛡️</span>
             <div>
-              <div className="platform-sidebar-title">Platform Superadmin</div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>$0/mo Cloudflare Core</div>
+              <div className="platform-sidebar-title">{user?.name || 'Platform Admin'}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>
+                {user?.email || '$0/mo Cloudflare Core'}
+              </div>
             </div>
           </div>
           <button
@@ -77,7 +79,10 @@ export default function PlatformLayout() {
         <div className="platform-sidebar-footer">
           <div style={{ marginBottom: '0.5rem' }}>
             <span className="platform-sidebar-role">PLATFORM OWNER</span>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text)', marginTop: '0.2rem' }}>
+              {user?.name || 'Platform Admin'}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
               {user?.email ?? 'owner@krwebinar.com'}
             </div>
           </div>
@@ -110,7 +115,7 @@ export default function PlatformLayout() {
               </svg>
             </button>
             <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text)' }}>
-              Platform Superadmin
+              {user?.name || 'Platform Admin'}
             </span>
           </div>
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
