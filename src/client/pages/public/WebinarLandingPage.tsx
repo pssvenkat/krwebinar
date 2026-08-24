@@ -431,6 +431,9 @@ export default function WebinarLandingPage() {
   const trainer = landingData?.trainer
   const config = landingData?.landingConfig
 
+  // Always call hooks unconditionally at the top level
+  const countdown = useCountdown(webinar?.startDate, webinar?.startTime)
+
   // If loading, show initial spinner
   if (isLoading) {
     return (
@@ -447,7 +450,6 @@ export default function WebinarLandingPage() {
 
   const registerUrl = webinar?.id ? `/register/${webinar.id}` : '/register'
   const dates = formatWebinarDate(webinar?.startDate, webinar?.startTime, webinar?.timezone || 'IST')
-  const countdown = useCountdown(webinar?.startDate, webinar?.startTime)
 
   const whatsappUrl = trainer?.whatsapp_community_url || 'https://chat.whatsapp.com/krave-community'
   const brandName = branding?.platformName || 'Krave Microgreens'
