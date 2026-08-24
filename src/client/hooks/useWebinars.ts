@@ -89,7 +89,10 @@ export function useCreateWebinar() {
       if (!res.ok) throw new Error(res.error.message)
       return res.data.webinar
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['webinars'] }) },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
+    },
   })
 }
 
@@ -104,6 +107,7 @@ export function useUpdateWebinar(id: string) {
     onSuccess: (w) => {
       qc.setQueryData(['webinar', id], w)
       void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
     },
   })
 }
@@ -119,6 +123,7 @@ export function usePublishWebinar() {
     onSuccess: (w) => {
       qc.setQueryData(['webinar', w.id], w)
       void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
     },
   })
 }
@@ -134,6 +139,7 @@ export function useGoLiveWebinar() {
     onSuccess: (w) => {
       qc.setQueryData(['webinar', w.id], w)
       void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
     },
   })
 }
@@ -149,6 +155,7 @@ export function useEndWebinar() {
     onSuccess: (w) => {
       qc.setQueryData(['webinar', w.id], w)
       void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
     },
   })
 }
@@ -159,7 +166,11 @@ export function useArchiveWebinar() {
     mutationFn: async (id: string) => {
       const res = await api.webinars.archive(id)
       if (!res.ok) throw new Error(res.error.message)
+      return res.data
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['webinars'] }) },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webinars'] })
+      void qc.invalidateQueries({ queryKey: ['public', 'landing'] })
+    },
   })
 }

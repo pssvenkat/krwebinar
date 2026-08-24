@@ -1110,15 +1110,25 @@ export async function upsertTrainerProfile(
 export async function getPublicFeaturedWebinar(db: D1Database, tenantId: string): Promise<DbWebinar | null> {
   // 1. Look for a currently LIVE webinar
   let webinar = await db
-    .prepare("SELECT * FROM webinars WHERE tenant_id = ? AND status = 'LIVE' ORDER BY updated_at DESC LIMIT 1")
+    .prepare("SELECT * FROM webinars WHERE tenant_id = ? AND UPPER(status) = 'LIVE' ORDER BY updated_at DESC LIMIT 1")
     .bind(tenantId)
     .first<DbWebinar>()
 
-  // 2. Look for the next upcoming PUBLISHED webinar
+  // 2. Look for the next upcoming PUBLISHED webinar with open registration
   if (!webinar) {
     webinar = await db
       .prepare(
-        "SELECT * FROM webinars WHERE tenant_id = ? AND status = 'PUBLISHED' AND registration_open = 1 ORDER BY start_date ASC, start_time ASC LIMIT 1",
+        "SELECT * FROM webinars WHERE tenant_id = ? AND UPPER(status) = 'PUBLISHED' AND (registration_open = 1 OR registration_open = '1') ORDER BY start_date ASC, start_time ASC LIMIT 1",
+      )
+      .bind(tenantId)
+      .first<DbWebinar>()
+  }
+
+  // 3. Fallback to any PUBLISHED webinar for this tenant
+  if (!webinar) {
+    webinar = await db
+      .prepare(
+        "SELECT * FROM webinars WHERE tenant_id = ? AND UPPER(status) = 'PUBLISHED' ORDER BY start_date ASC, start_time ASC LIMIT 1",
       )
       .bind(tenantId)
       .first<DbWebinar>()

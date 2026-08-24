@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api, type LandingPageSettings } from '../../lib/api'
+import { api, type LandingPageSettings, type BenefitItem, type TestimonialItem, type FaqItemData } from '../../lib/api'
 import { useBranding } from '../../hooks/useBranding'
 
 // ── Countdown Hook ────────────────────────────────────────────────
@@ -401,21 +401,30 @@ export default function WebinarLandingPage() {
     queryFn: async () => {
       if (routeWebinarId) {
         const [webinarFetch, trainerRes, configRes] = await Promise.all([
-          fetch(`/api/v1/webinars/${routeWebinarId}/public`, { credentials: 'include' }).then((r) => r.json() as Promise<any>),
-          api.trainer.getPublic(),
-          api.landing.getPublicConfig(),
+          fetch(`/api/v1/webinars/${routeWebinarId}/public`, { credentials: 'include' })
+            .then((r) => r.json() as Promise<any>)
+            .catch(() => ({ ok: false })),
+          api.trainer.getPublic().catch(() => ({ ok: false })),
+          api.landing.getPublicConfig().catch(() => ({ ok: false })),
         ])
         return {
-          webinar: webinarFetch.ok ? webinarFetch.data.webinar : null,
-          trainer: trainerRes.ok ? trainerRes.data : null,
-          landingConfig: configRes.ok ? configRes.data : undefined,
+          webinar: webinarFetch && 'ok' in webinarFetch && webinarFetch.ok ? (webinarFetch as any).data.webinar : null,
+          trainer: trainerRes && 'ok' in trainerRes && trainerRes.ok ? (trainerRes as any).data : null,
+          landingConfig: configRes && 'ok' in configRes && configRes.ok ? (configRes as any).data : undefined,
         }
       }
       const res = await api.landing.getFeatured()
-      if (!res.ok) throw new Error('Failed to load landing data')
+      if (!res.ok) {
+        const cfg = await api.landing.getPublicConfig().catch(() => ({ ok: false }))
+        return {
+          webinar: null,
+          trainer: null,
+          landingConfig: cfg && 'ok' in cfg && cfg.ok ? (cfg as any).data : undefined,
+        }
+      }
       return res.data
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
   })
 
   const webinar = landingData?.webinar
@@ -945,7 +954,7 @@ export default function WebinarLandingPage() {
               gap: '1.5rem',
             }}
           >
-            {learningPoints.map((item) => (
+            {learningPoints.map((item: BenefitItem) => (
               <div
                 key={item.num}
                 style={{
@@ -1156,7 +1165,7 @@ export default function WebinarLandingPage() {
               gap: '1.5rem',
             }}
           >
-            {testimonials.map((t, idx) => (
+            {testimonials.map((t: TestimonialItem, idx: number) => (
               <div
                 key={idx}
                 style={{
@@ -1243,7 +1252,7 @@ export default function WebinarLandingPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {faqs.map((faq, index) => (
+            {faqs.map((faq: FaqItemData, index: number) => (
               <FaqItem
                 key={index}
                 question={faq.q}

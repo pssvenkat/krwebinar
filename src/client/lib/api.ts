@@ -201,7 +201,7 @@ export const api = {
         webinar: (WebinarSummary & { spotsLeft: number; isFull: boolean; description: string | null; isLive: boolean }) | null
         trainer: TrainerProfile
         landingConfig?: LandingPageSettings
-      }>('/public/webinars/featured'),
+      }>('/webinars/featured'),
   },
 
   // Custom Domains

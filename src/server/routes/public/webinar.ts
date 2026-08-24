@@ -57,7 +57,7 @@ function serializePublicWebinar(w: Awaited<ReturnType<typeof getPublicWebinar>>)
 
 // ── GET /webinars/featured (Public Landing Page data) ──────────────
 
-publicWebinarRoutes.get('/featured', async (c) => {
+async function handleFeatured(c: any) {
   const tenant = c.get('tenant')
   const [webinar, trainer, landingConfig] = await Promise.all([
     getPublicFeaturedWebinar(c.env.DB, tenant.id),
@@ -88,7 +88,12 @@ publicWebinarRoutes.get('/featured', async (c) => {
       landingConfig,
     },
   })
-})
+}
+
+publicWebinarRoutes.get('/featured', handleFeatured)
+publicWebinarRoutes.get('/webinars/featured', handleFeatured)
+publicWebinarRoutes.get('/public/webinars/featured', handleFeatured)
+publicWebinarRoutes.get('/public/featured', handleFeatured)
 
 // ── GET /webinars/:id/public ──────────────────────────────────────
 
