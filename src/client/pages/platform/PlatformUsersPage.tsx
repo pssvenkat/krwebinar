@@ -141,25 +141,233 @@ export default function PlatformUsersPage() {
         </Button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="platform-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '1.5rem' }}>
-        <div className="platform-kpi-card">
-          <p className="platform-kpi-label">Total System Users</p>
-          <p className="platform-kpi-value">{totalUsers}</p>
+      {/* Snapshot KPI Tiles */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1.25rem',
+          marginBottom: '2rem',
+        }}
+      >
+        {/* Total System Users Tile */}
+        <div
+          style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e5e7eb)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#f0fdf4',
+              color: '#16a34a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              flexShrink: 0,
+            }}
+          >
+            👥
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--color-muted, #6b7280)',
+                marginBottom: '0.25rem',
+              }}
+            >
+              Total System Users
+            </div>
+            <div
+              style={{
+                fontSize: '1.85rem',
+                fontWeight: 800,
+                color: 'var(--color-text, #111827)',
+                lineHeight: 1,
+              }}
+            >
+              {totalUsers}
+            </div>
+          </div>
         </div>
-        <div className="platform-kpi-card">
-          <p className="platform-kpi-label">Platform Owners</p>
-          <p className="platform-kpi-value">{platformOwners}</p>
+
+        {/* Platform Owners Tile */}
+        <div
+          style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e5e7eb)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#eff6ff',
+              color: '#2563eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              flexShrink: 0,
+            }}
+          >
+            🛡️
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--color-muted, #6b7280)',
+                marginBottom: '0.25rem',
+              }}
+            >
+              Platform Owners
+            </div>
+            <div
+              style={{
+                fontSize: '1.85rem',
+                fontWeight: 800,
+                color: '#2563eb',
+                lineHeight: 1,
+              }}
+            >
+              {platformOwners}
+            </div>
+          </div>
         </div>
-        <div className="platform-kpi-card">
-          <p className="platform-kpi-label">Tenant Admins</p>
-          <p className="platform-kpi-value">{tenantAdmins}</p>
+
+        {/* Tenant Admins Tile */}
+        <div
+          style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e5e7eb)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#f5f3ff',
+              color: '#7c3aed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              flexShrink: 0,
+            }}
+          >
+            🏢
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--color-muted, #6b7280)',
+                marginBottom: '0.25rem',
+              }}
+            >
+              Tenant Admins
+            </div>
+            <div
+              style={{
+                fontSize: '1.85rem',
+                fontWeight: 800,
+                color: 'var(--color-text, #111827)',
+                lineHeight: 1,
+              }}
+            >
+              {tenantAdmins}
+            </div>
+          </div>
         </div>
-        <div className="platform-kpi-card">
-          <p className="platform-kpi-label">Active Accounts</p>
-          <p className="platform-kpi-value" style={{ color: 'var(--color-success)' }}>
-            {activeUsers}
-          </p>
+
+        {/* Active Accounts Tile */}
+        <div
+          style={{
+            background: 'var(--color-surface, #ffffff)',
+            border: '1px solid var(--color-border, #e5e7eb)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#ecfdf5',
+              color: '#059669',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              flexShrink: 0,
+            }}
+          >
+            🟢
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--color-muted, #6b7280)',
+                marginBottom: '0.25rem',
+              }}
+            >
+              Active Accounts
+            </div>
+            <div
+              style={{
+                fontSize: '1.85rem',
+                fontWeight: 800,
+                color: '#059669',
+                lineHeight: 1,
+              }}
+            >
+              {activeUsers}
+            </div>
+          </div>
         </div>
       </div>
 

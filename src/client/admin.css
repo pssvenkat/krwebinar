@@ -450,9 +450,11 @@ select.input-field:focus {
 
 /* ── KPI grid ─────────────────────────────────────────────────── */
 
-.analytics-kpi-grid {
+.analytics-kpi-grid,
+.admin-kpi-grid,
+.platform-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1rem;
 }
 
@@ -460,7 +462,9 @@ select.input-field:focus {
   grid-template-columns: repeat(3, 1fr);
 }
 
-.analytics-kpi-card {
+.analytics-kpi-card,
+.admin-kpi-card,
+.platform-kpi-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
@@ -468,6 +472,7 @@ select.input-field:focus {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .analytics-kpi-card--highlight {
@@ -475,7 +480,9 @@ select.input-field:focus {
   border-color: #bfdbfe;
 }
 
-.analytics-kpi-label {
+.analytics-kpi-label,
+.admin-kpi-label,
+.platform-kpi-label {
   margin: 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -484,7 +491,9 @@ select.input-field:focus {
   color: var(--color-muted);
 }
 
-.analytics-kpi-value {
+.analytics-kpi-value,
+.admin-kpi-value,
+.platform-kpi-value {
   margin: 0;
   font-size: 2rem;
   font-weight: 800;
@@ -492,7 +501,9 @@ select.input-field:focus {
   line-height: 1.1;
 }
 
-.analytics-kpi-sub {
+.analytics-kpi-sub,
+.admin-kpi-sub,
+.platform-kpi-sub {
   margin: 0;
   font-size: 0.75rem;
   color: var(--color-muted);
