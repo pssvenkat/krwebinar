@@ -97,6 +97,7 @@ export default function AdminLayout() {
             <AdminNavLink to="/admin/analytics">📈 Analytics</AdminNavLink>
           </NavGroup>
           <NavGroup label="Organization">
+            <AdminNavLink to="/admin/landing-page">📄 Landing Page CMS</AdminNavLink>
             <AdminNavLink to="/admin/trainer">🎙️ Trainer Profile</AdminNavLink>
             <AdminNavLink to="/admin/branding">🎨 Branding &amp; Theme</AdminNavLink>
             <AdminNavLink to="/admin/domains">🌐 Custom Domains</AdminNavLink>

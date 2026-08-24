@@ -26,6 +26,7 @@ import {
   getTenantSettings,
   getPublicFeaturedWebinar,
   getTrainerProfile,
+  getLandingPageSettings,
 } from '../../lib/db'
 import { generateSecureToken } from '../../lib/jwt'
 import type { Env, HonoVariables } from '../../types'
@@ -58,9 +59,10 @@ function serializePublicWebinar(w: Awaited<ReturnType<typeof getPublicWebinar>>)
 
 publicWebinarRoutes.get('/featured', async (c) => {
   const tenant = c.get('tenant')
-  const [webinar, trainer] = await Promise.all([
+  const [webinar, trainer, landingConfig] = await Promise.all([
     getPublicFeaturedWebinar(c.env.DB, tenant.id),
     getTrainerProfile(c.env.DB, tenant.id),
+    getLandingPageSettings(c.env.DB, tenant.id),
   ])
 
   let spotsLeft = 300
@@ -83,6 +85,7 @@ publicWebinarRoutes.get('/featured', async (c) => {
           }
         : null,
       trainer,
+      landingConfig,
     },
   })
 })

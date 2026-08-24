@@ -1,15 +1,15 @@
 /**
- * WebinarLandingPage — High-Converting Public Webinar Landing Page
+ * WebinarLandingPage — High-Converting Public Webinar Landing Page & CMS Fallback
  *
  * Modeled after https://krave-business-platform-webinar.vercel.app/
  * Dynamically pulls webinar details, trainer profile, and branding from backend APIs.
- * Directs attendees to the registration page (/register/:webinarId).
+ * When no upcoming webinar is scheduled, displays static notice and auto-redirects in 5s.
  */
 
 import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../../lib/api'
+import { api, type LandingPageSettings } from '../../lib/api'
 import { useBranding } from '../../hooks/useBranding'
 
 // ── Countdown Hook ────────────────────────────────────────────────
@@ -79,23 +79,25 @@ function formatWebinarDate(dateStr?: string, timeStr?: string, timezone = 'IST')
       return { short: `${dateStr} ${timePart}`, full: `${dateStr} at ${timePart} (${timezone})` }
     }
 
-    const short = dateObj.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }) + ` ${timezone}`
+    const short =
+      dateObj.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }) + ` ${timezone}`
 
-    const full = dateObj.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }) + ` ${timezone}`
+    const full =
+      dateObj.toLocaleDateString('en-IN', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }) + ` ${timezone}`
 
     return { short, full }
   } catch {
@@ -105,7 +107,17 @@ function formatWebinarDate(dateStr?: string, timeStr?: string, timezone = 'IST')
 
 // ── FAQ Accordion Item Component ──────────────────────────────────
 
-function FaqItem({ question, answer, isOpen, onToggle }: { question: string; answer: string; isOpen: boolean; onToggle: () => void }) {
+function FaqItem({
+  question,
+  answer,
+  isOpen,
+  onToggle,
+}: {
+  question: string
+  answer: string
+  isOpen: boolean
+  onToggle: () => void
+}) {
   return (
     <div
       style={{
@@ -165,6 +177,217 @@ function FaqItem({ question, answer, isOpen, onToggle }: { question: string; ans
   )
 }
 
+// ── No Webinar Fallback & 5-Second Redirection Screen ─────────────
+
+function NoWebinarFallbackScreen({
+  branding,
+  landingConfig,
+}: {
+  branding?: any
+  landingConfig?: LandingPageSettings
+}) {
+  const redirectUrl = landingConfig?.fallback_redirect_url || 'https://kravemicrogreens.in'
+  const initialSecs = landingConfig?.fallback_redirect_secs || 5
+
+  const [secondsLeft, setSecondsLeft] = useState(initialSecs)
+  const [isPaused, setIsPaused] = useState(false)
+
+  useEffect(() => {
+    if (isPaused) return
+
+    if (secondsLeft <= 0) {
+      window.location.href = redirectUrl
+      return
+    }
+
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => prev - 1)
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [secondsLeft, isPaused, redirectUrl])
+
+  const brandName = branding?.platformName || 'Krave Microgreens'
+  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / initialSecs) * 100))
+
+  return (
+    <div
+      style={{
+        fontFamily: 'var(--font-body, Inter, system-ui, sans-serif)',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(180deg, #edf6f0 0%, #f7fbf8 50%, #ffffff 100%)',
+        padding: '2rem 1rem',
+        textAlign: 'center',
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '560px',
+          width: '100%',
+          background: '#ffffff',
+          borderRadius: '28px',
+          border: '1px solid #e2efe6',
+          padding: 'clamp(2rem, 5vw, 3.5rem)',
+          boxShadow: '0 20px 40px rgba(30, 86, 49, 0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        {/* Brand Logo */}
+        <div style={{ marginBottom: '1.75rem' }}>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={brandName}
+              style={{ height: '44px', maxWidth: '180px', objectFit: 'contain' }}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+              <span style={{ fontSize: '2rem' }}>🌱</span>
+              <span style={{ fontWeight: 900, fontSize: '1.35rem', color: '#1e5631' }}>{brandName}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Status Badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: '#fef3c7',
+            border: '1px solid #fde68a',
+            borderRadius: '999px',
+            padding: '0.4rem 1.1rem',
+            color: '#b45309',
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            marginBottom: '1.25rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          <span>⏳</span>
+          <span>Next Masterclass Batch In Preparation</span>
+        </div>
+
+        {/* Title */}
+        <h1
+          style={{
+            fontSize: 'clamp(1.5rem, 3.5vw, 2rem)',
+            fontWeight: 900,
+            color: '#143623',
+            lineHeight: 1.25,
+            marginBottom: '0.85rem',
+          }}
+        >
+          {landingConfig?.fallback_title || 'No Live Webinar Scheduled At The Moment'}
+        </h1>
+
+        {/* Description */}
+        <p style={{ fontSize: '0.95rem', color: '#4a6b57', lineHeight: 1.6, marginBottom: '2rem' }}>
+          {landingConfig?.fallback_message ||
+            'We are currently scheduling our next high-yield live masterclass. You will be redirected to our main website shortly.'}
+        </p>
+
+        {/* 5-Second Countdown Ticker & Progress Bar */}
+        <div
+          style={{
+            width: '100%',
+            background: '#f4f9f5',
+            border: '1px solid #d0e6d6',
+            borderRadius: '16px',
+            padding: '1.25rem',
+            marginBottom: '1.75rem',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.6rem',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              color: '#1e5631',
+              marginBottom: '0.75rem',
+            }}
+          >
+            <span>
+              {isPaused ? '⏸️ Auto-redirect paused' : `⏳ Redirecting in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}...`}
+            </span>
+          </div>
+
+          {/* Animated Progress Bar */}
+          <div
+            style={{
+              width: '100%',
+              height: '6px',
+              background: '#e2efe6',
+              borderRadius: '999px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${progressPercent}%`,
+                background: '#16a34a',
+                transition: 'width 1s linear',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+          <a
+            href={redirectUrl}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              background: '#1e5631',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '1rem',
+              padding: '0.9rem',
+              borderRadius: '14px',
+              textDecoration: 'none',
+              boxShadow: '0 4px 14px rgba(30, 86, 49, 0.2)',
+            }}
+          >
+            <span>Go to Website Now →</span>
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setIsPaused((prev) => !prev)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#6b7280',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: '0.4rem',
+            }}
+          >
+            {isPaused ? '▶ Resume Auto-Redirect' : '⏸️ Stay on this page'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Landing Page Component ───────────────────────────────────
 
 export default function WebinarLandingPage() {
@@ -172,18 +395,20 @@ export default function WebinarLandingPage() {
   const { data: branding } = useBranding()
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
-  // Fetch Featured Webinar & Trainer
-  const { data: landingData } = useQuery({
+  // Fetch Featured Webinar, Trainer & Landing Config
+  const { data: landingData, isLoading } = useQuery({
     queryKey: ['public', 'landing', 'featured', routeWebinarId],
     queryFn: async () => {
       if (routeWebinarId) {
-        const [webinarFetch, trainerRes] = await Promise.all([
+        const [webinarFetch, trainerRes, configRes] = await Promise.all([
           fetch(`/api/v1/webinars/${routeWebinarId}/public`, { credentials: 'include' }).then((r) => r.json() as Promise<any>),
           api.trainer.getPublic(),
+          api.landing.getPublicConfig(),
         ])
         return {
           webinar: webinarFetch.ok ? webinarFetch.data.webinar : null,
           trainer: trainerRes.ok ? trainerRes.data : null,
+          landingConfig: configRes.ok ? configRes.data : undefined,
         }
       }
       const res = await api.landing.getFeatured()
@@ -195,6 +420,21 @@ export default function WebinarLandingPage() {
 
   const webinar = landingData?.webinar
   const trainer = landingData?.trainer
+  const config = landingData?.landingConfig
+
+  // If loading, show initial spinner
+  if (isLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8faf5' }}>
+        <div className="admin-spinner" />
+      </div>
+    )
+  }
+
+  // If NO active or upcoming webinar is scheduled, render fallback screen with 5s countdown redirect
+  if (!webinar) {
+    return <NoWebinarFallbackScreen branding={branding} landingConfig={config} />
+  }
 
   const registerUrl = webinar?.id ? `/register/${webinar.id}` : '/register'
   const dates = formatWebinarDate(webinar?.startDate, webinar?.startTime, webinar?.timezone || 'IST')
@@ -204,109 +444,124 @@ export default function WebinarLandingPage() {
   const brandName = branding?.platformName || 'Krave Microgreens'
   const spotsLeft = webinar?.spotsLeft ?? 300
 
-  // 6 Core Learning Modules
-  const learningPoints = [
-    {
-      icon: '🌱',
-      num: '1',
-      title: 'Start with Zero Experience',
-      desc: 'No farming background needed. Our proven step-by-step system is engineered for complete beginners.',
-    },
-    {
-      icon: '💰',
-      num: '2',
-      title: 'Earn ₹25,000–₹50,000/Month',
-      desc: 'Learn exactly how to price, sell, and scale to a reliable full-time income from fresh microgreens.',
-    },
-    {
-      icon: '📦',
-      num: '3',
-      title: 'Sell Before You Grow',
-      desc: 'Discover our pre-order strategy so you have paying customers before spending a single rupee on seeds.',
-    },
-    {
-      icon: '🏠',
-      num: '4',
-      title: 'Grow From Any Space',
-      desc: 'A balcony, terrace, or spare corner is enough. No heavy land or expensive greenhouse required.',
-    },
-    {
-      icon: '⚡',
-      num: '5',
-      title: 'Harvest in 7–14 Days',
-      desc: 'Microgreens are the fastest-growing crop on earth. Get your first harvest and revenue within 2 weeks.',
-    },
-    {
-      icon: '🎯',
-      num: '6',
-      title: 'Live Q&A with Trainer',
-      desc: `Get your specific questions answered live and leave with a personalized, actionable launch plan.`,
-    },
-  ]
+  // CMS Overrides or intelligent defaults
+  const heroHeadline = config?.hero_headline_override || webinar?.title || 'Start & Scale Your Profitable Microgreens Business'
+  const heroSubheading =
+    config?.hero_subheading_override || webinar?.description || `${brandName} Live Masterclass — Proven Roadmap to ₹30,000–₹50,000/Month from Home`
+  const badgeText = config?.hero_badge_text || 'FREE LIVE WEBINAR'
+  const socialProofText = config?.hero_social_proof_text || '2,000+ entrepreneurs already registered'
+  const primaryCtaText = config?.hero_primary_cta_text || '🎯 Reserve My Free Spot'
+  const secondaryCtaText = config?.hero_secondary_cta_text || '💬 Join WhatsApp Community'
 
-  // Testimonials
-  const testimonials = [
-    {
-      initials: 'PS',
-      name: 'Priya Sharma',
-      location: 'Bengaluru · Sunflower & Pea shoots',
-      rating: 5,
-      quote:
-        'I was skeptical at first, but within 6 weeks of following the system I had my first ₹18,000 month. The webinar gave me the confidence to start immediately.',
-    },
-    {
-      initials: 'RM',
-      name: 'Rajesh Mehta',
-      location: 'Mumbai · Radish & Broccoli',
-      rating: 5,
-      quote:
-        'I attended the webinar in early 2026. Within months I had established my commercial setup. Now I earn more than my previous IT job and work right from home.',
-    },
-    {
-      initials: 'AK',
-      name: 'Anita Krishnan',
-      location: 'Chennai · Wheatgrass & Lentils',
-      rating: 5,
-      quote:
-        'The most actionable webinar I have ever attended. Not just theory — real numbers, real strategies, real results. Completely free and worth every minute.',
-    },
-  ]
+  const learningPoints =
+    config?.benefits && config.benefits.length > 0
+      ? config.benefits
+      : [
+          {
+            icon: '🌱',
+            num: '1',
+            title: 'Start with Zero Experience',
+            desc: 'No farming background needed. Our proven step-by-step system is engineered for complete beginners.',
+          },
+          {
+            icon: '💰',
+            num: '2',
+            title: 'Earn ₹25,000–₹50,000/Month',
+            desc: 'Learn exactly how to price, sell, and scale to a reliable full-time income from fresh microgreens.',
+          },
+          {
+            icon: '📦',
+            num: '3',
+            title: 'Sell Before You Grow',
+            desc: 'Discover our pre-order strategy so you have paying customers before spending a single rupee on seeds.',
+          },
+          {
+            icon: '🏠',
+            num: '4',
+            title: 'Grow From Any Space',
+            desc: 'A balcony, terrace, or spare corner is enough. No heavy land or expensive greenhouse required.',
+          },
+          {
+            icon: '⚡',
+            num: '5',
+            title: 'Harvest in 7–14 Days',
+            desc: 'Microgreens are the fastest-growing crop on earth. Get your first harvest and revenue within 2 weeks.',
+          },
+          {
+            icon: '🎯',
+            num: '6',
+            title: 'Live Q&A with Trainer',
+            desc: 'Get your specific questions answered live and leave with a personalized, actionable launch plan.',
+          },
+        ]
 
-  // FAQs
-  const faqs = [
-    {
-      q: 'Is the webinar completely free?',
-      a: 'Yes, 100% free. There are no hidden fees or paywalls. We run this masterclass to share practical knowledge and grow the microgreens entrepreneurship community across India.',
-    },
-    {
-      q: 'Do I need any farming or agriculture experience?',
-      a: 'Absolutely not. The webinar is tailored from the ground up for complete beginners. If you can water a tray, you can grow high-yield microgreens.',
-    },
-    {
-      q: 'What equipment do I need to get started?',
-      a: 'Just trays, a growing medium (coco peat), non-GMO seeds, and water. A complete starter setup costs as little as ₹2,000–₹3,000, which we will cover step-by-step.',
-    },
-    {
-      q: 'How much space do I need in my home or apartment?',
-      a: 'As little as 10–20 square feet. A small apartment balcony, utility area, or a vertical wire rack inside a spare room works perfectly.',
-    },
-    {
-      q: 'Will the webinar recording be available?',
-      a: 'A replay will be shared with registered attendees. However, attending live allows you to ask questions directly in the live interactive Q&A and participate in live polls.',
-    },
-    {
-      q: 'How quickly can I make my first sale?',
-      a: 'Microgreens mature in 7–14 days. With our pre-order strategy, many attendees secure their first customer orders before even sowing their first tray.',
-    },
-    {
-      q: 'Is there a community I can join for support?',
-      a: 'Yes! After registering, you can join our active WhatsApp community with fellow growers sharing tips, harvest photos, and local business insights.',
-    },
-    {
-      q: 'Does this business model work in my city?',
-      a: 'Microgreens are in high demand across all Indian cities — Tier 1 metropolises as well as Tier 2 & Tier 3 towns with restaurants, cafes, and health-conscious families.',
-    },
-  ]
+  const testimonials =
+    config?.testimonials && config.testimonials.length > 0
+      ? config.testimonials
+      : [
+          {
+            initials: 'PS',
+            name: 'Priya Sharma',
+            location: 'Bengaluru · Sunflower & Pea shoots',
+            rating: 5,
+            quote:
+              'I was skeptical at first, but within 6 weeks of following the system I had my first ₹18,000 month. The webinar gave me the confidence to start immediately.',
+          },
+          {
+            initials: 'RM',
+            name: 'Rajesh Mehta',
+            location: 'Mumbai · Radish & Broccoli',
+            rating: 5,
+            quote:
+              'I attended the webinar in early 2026. Within months I had established my commercial setup. Now I earn more than my previous IT job and work right from home.',
+          },
+          {
+            initials: 'AK',
+            name: 'Anita Krishnan',
+            location: 'Chennai · Wheatgrass & Lentils',
+            rating: 5,
+            quote:
+              'The most actionable webinar I have ever attended. Not just theory — real numbers, real strategies, real results. Completely free and worth every minute.',
+          },
+        ]
+
+  const faqs =
+    config?.faqs && config.faqs.length > 0
+      ? config.faqs
+      : [
+          {
+            q: 'Is the webinar completely free?',
+            a: 'Yes, 100% free. There are no hidden fees or paywalls. We run this masterclass to share practical knowledge and grow the microgreens entrepreneurship community across India.',
+          },
+          {
+            q: 'Do I need any farming or agriculture experience?',
+            a: 'Absolutely not. The webinar is tailored from the ground up for complete beginners. If you can water a tray, you can grow high-yield microgreens.',
+          },
+          {
+            q: 'What equipment do I need to get started?',
+            a: 'Just trays, a growing medium (coco peat), non-GMO seeds, and water. A complete starter setup costs as little as ₹2,000–₹3,000, which we will cover step-by-step.',
+          },
+          {
+            q: 'How much space do I need in my home or apartment?',
+            a: 'As little as 10–20 square feet. A small apartment balcony, utility area, or a vertical wire rack inside a spare room works perfectly.',
+          },
+          {
+            q: 'Will the webinar recording be available?',
+            a: 'A replay will be shared with registered attendees. However, attending live allows you to ask questions directly in the live interactive Q&A and participate in live polls.',
+          },
+          {
+            q: 'How quickly can I make my first sale?',
+            a: 'Microgreens mature in 7–14 days. With our pre-order strategy, many attendees secure their first customer orders before even sowing their first tray.',
+          },
+          {
+            q: 'Is there a community I can join for support?',
+            a: 'Yes! After registering, you can join our active WhatsApp community with fellow growers sharing tips, harvest photos, and local business insights.',
+          },
+          {
+            q: 'Does this business model work in my city?',
+            a: 'Microgreens are in high demand across all Indian cities — Tier 1 metropolises as well as Tier 2 & Tier 3 towns with restaurants, cafes, and health-conscious families.',
+          },
+        ]
 
   return (
     <div style={{ fontFamily: 'var(--font-body, Inter, system-ui, sans-serif)', color: '#143623', background: '#f8faf5', minHeight: '100vh' }}>
@@ -459,7 +714,7 @@ export default function WebinarLandingPage() {
               }}
             />
             <span style={{ color: '#1e5631', fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-              FREE LIVE WEBINAR · {dates.short}
+              {badgeText} · {dates.short}
             </span>
           </div>
 
@@ -474,7 +729,7 @@ export default function WebinarLandingPage() {
               marginBottom: '1.25rem',
             }}
           >
-            {webinar?.title || 'Start & Scale Your Profitable Microgreens Business'}
+            {heroHeadline}
           </h1>
 
           {/* Subtitle */}
@@ -488,7 +743,7 @@ export default function WebinarLandingPage() {
               lineHeight: 1.5,
             }}
           >
-            {webinar?.description || `${brandName} Live Masterclass — Proven Roadmap to ₹30,000–₹50,000/Month from Home`}
+            {heroSubheading}
           </p>
 
           {/* Metadata Badges */}
@@ -618,8 +873,7 @@ export default function WebinarLandingPage() {
                 transition: 'all 0.2s ease',
               }}
             >
-              <span>🎯</span>
-              <span>Reserve My Free Spot</span>
+              <span>{primaryCtaText}</span>
             </Link>
 
             <a
@@ -643,14 +897,13 @@ export default function WebinarLandingPage() {
                 transition: 'all 0.2s ease',
               }}
             >
-              <span>💬</span>
-              <span>Join WhatsApp Community</span>
+              <span>{secondaryCtaText}</span>
             </a>
           </div>
 
           {/* Social Proof Line */}
           <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#4a6b57', fontWeight: 600 }}>
-            🔥 <strong style={{ color: '#143623', fontWeight: 800 }}>2,000+</strong> entrepreneurs already registered · Limited to{' '}
+            🔥 <strong style={{ color: '#143623', fontWeight: 800 }}>{socialProofText}</strong> · Limited to{' '}
             <strong style={{ color: '#143623' }}>{spotsLeft}</strong> seats
           </p>
         </div>
@@ -1058,8 +1311,7 @@ export default function WebinarLandingPage() {
               transition: 'all 0.2s ease',
             }}
           >
-            <span>🎯</span>
-            <span>Register Now — It&apos;s Free</span>
+            <span>{primaryCtaText}</span>
           </Link>
 
           <p style={{ marginTop: '1.25rem', fontSize: '0.9rem', color: '#6b8e78', fontWeight: 600 }}>
@@ -1134,8 +1386,7 @@ export default function WebinarLandingPage() {
             boxShadow: '0 4px 12px rgba(30, 86, 49, 0.2)',
           }}
         >
-          <span>🎯</span>
-          <span>Reserve My Free Spot</span>
+          <span>{primaryCtaText}</span>
         </Link>
       </div>
 

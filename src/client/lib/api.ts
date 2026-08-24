@@ -190,12 +190,17 @@ export const api = {
     getPublic: () => _fetch<TrainerProfile>('/public/trainer'),
   },
 
-  // Public Landing Page Data
+  // Public Landing Page & CMS
   landing: {
+    getConfig: () => _fetch<LandingPageSettings>('/admin/landing'),
+    updateConfig: (data: Partial<LandingPageSettings>) =>
+      _fetch<LandingPageSettings>('/admin/landing', { method: 'PUT', body: data }),
+    getPublicConfig: () => _fetch<LandingPageSettings>('/public/landing-config'),
     getFeatured: () =>
       _fetch<{
         webinar: (WebinarSummary & { spotsLeft: number; isFull: boolean; description: string | null; isLive: boolean }) | null
         trainer: TrainerProfile
+        landingConfig?: LandingPageSettings
       }>('/public/webinars/featured'),
   },
 
@@ -342,6 +347,42 @@ export interface TrainerProfile {
   experience_years: string
   whatsapp_community_url: string | null
   social_links?: Record<string, string>
+}
+
+export interface BenefitItem {
+  icon: string
+  num: string
+  title: string
+  desc: string
+}
+
+export interface TestimonialItem {
+  initials: string
+  name: string
+  location: string
+  rating: number
+  quote: string
+}
+
+export interface FaqItemData {
+  q: string
+  a: string
+}
+
+export interface LandingPageSettings {
+  fallback_redirect_url: string
+  fallback_redirect_secs: number
+  fallback_title: string
+  fallback_message: string
+  hero_headline_override: string | null
+  hero_subheading_override: string | null
+  hero_badge_text: string
+  hero_social_proof_text: string
+  hero_primary_cta_text: string
+  hero_secondary_cta_text: string
+  benefits: BenefitItem[]
+  testimonials: TestimonialItem[]
+  faqs: FaqItemData[]
 }
 
 export interface SettingsData {

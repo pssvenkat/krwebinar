@@ -187,3 +187,23 @@ export interface DbTrainerProfile {
   updated_at: string
 }
 
+export interface DbLandingPageSettings {
+  id: string
+  tenant_id: string
+  fallback_redirect_url: string
+  fallback_redirect_secs: number
+  fallback_title: string
+  fallback_message: string
+  hero_headline_override: string | null
+  hero_subheading_override: string | null
+  hero_badge_text: string | null
+  hero_social_proof_text: string | null
+  hero_primary_cta_text: string | null
+  hero_secondary_cta_text: string | null
+  benefits_json: string       // JSON array
+  testimonials_json: string   // JSON array
+  faqs_json: string           // JSON array
+  footer_links_json: string   // JSON array
+  updated_at: string
+}
+

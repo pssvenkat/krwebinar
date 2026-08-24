@@ -29,8 +29,9 @@ const AdminLeadsPage             = lazy(() => import('./pages/admin/AdminLeadsPa
 // Phase 9: Analytics pages (lazy-loaded)
 const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyticsPage'))
 const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
-// Phase 10: Branding & Trainer pages (lazy-loaded)
+// Phase 10: Branding, Trainer & Landing CMS pages (lazy-loaded)
 const AdminTrainerPage           = lazy(() => import('./pages/admin/AdminTrainerPage'))
+const AdminLandingPageEditor     = lazy(() => import('./pages/admin/AdminLandingPageEditor'))
 const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
 const AdminProfilePage           = lazy(() => import('./pages/admin/AdminProfilePage'))
 const AdminPrivacyPage           = lazy(() => import('./pages/admin/AdminPrivacyPage'))
@@ -106,6 +107,8 @@ export default function App() {
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="trainer" element={<AdminTrainerPage />} />
+            <Route path="landing-page" element={<AdminLandingPageEditor />} />
+            <Route path="landing" element={<AdminLandingPageEditor />} />
             <Route path="profile" element={<AdminProfilePage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
             <Route path="domains" element={<AdminDomainsPage />} />

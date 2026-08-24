@@ -1124,15 +1124,312 @@ export async function getPublicFeaturedWebinar(db: D1Database, tenantId: string)
       .first<DbWebinar>()
   }
 
-  // 3. Fallback to any published webinar or latest webinar
-  if (!webinar) {
-    webinar = await db
-      .prepare("SELECT * FROM webinars WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1")
+  return webinar ?? null
+}
+
+// ── Landing Page CMS & Fallback Settings Helpers ───────────────────
+
+export interface BenefitItem {
+  icon: string
+  num: string
+  title: string
+  desc: string
+}
+
+export interface TestimonialItem {
+  initials: string
+  name: string
+  location: string
+  rating: number
+  quote: string
+}
+
+export interface FaqItemData {
+  q: string
+  a: string
+}
+
+export interface LandingPageSettingsData {
+  fallback_redirect_url: string
+  fallback_redirect_secs: number
+  fallback_title: string
+  fallback_message: string
+  hero_headline_override: string | null
+  hero_subheading_override: string | null
+  hero_badge_text: string
+  hero_social_proof_text: string
+  hero_primary_cta_text: string
+  hero_secondary_cta_text: string
+  benefits: BenefitItem[]
+  testimonials: TestimonialItem[]
+  faqs: FaqItemData[]
+}
+
+export const DEFAULT_BENEFITS: BenefitItem[] = [
+  {
+    icon: '🌱',
+    num: '1',
+    title: 'Start with Zero Experience',
+    desc: 'No farming background needed. Our proven step-by-step system is engineered for complete beginners.',
+  },
+  {
+    icon: '💰',
+    num: '2',
+    title: 'Earn ₹25,000–₹50,000/Month',
+    desc: 'Learn exactly how to price, sell, and scale to a reliable full-time income from fresh microgreens.',
+  },
+  {
+    icon: '📦',
+    num: '3',
+    title: 'Sell Before You Grow',
+    desc: 'Discover our pre-order strategy so you have paying customers before spending a single rupee on seeds.',
+  },
+  {
+    icon: '🏠',
+    num: '4',
+    title: 'Grow From Any Space',
+    desc: 'A balcony, terrace, or spare corner is enough. No heavy land or expensive greenhouse required.',
+  },
+  {
+    icon: '⚡',
+    num: '5',
+    title: 'Harvest in 7–14 Days',
+    desc: 'Microgreens are the fastest-growing crop on earth. Get your first harvest and revenue within 2 weeks.',
+  },
+  {
+    icon: '🎯',
+    num: '6',
+    title: 'Live Q&A with Trainer',
+    desc: 'Get your specific questions answered live and leave with a personalized, actionable launch plan.',
+  },
+]
+
+export const DEFAULT_TESTIMONIALS: TestimonialItem[] = [
+  {
+    initials: 'PS',
+    name: 'Priya Sharma',
+    location: 'Bengaluru · Sunflower & Pea shoots',
+    rating: 5,
+    quote:
+      'I was skeptical at first, but within 6 weeks of following the system I had my first ₹18,000 month. The webinar gave me the confidence to start immediately.',
+  },
+  {
+    initials: 'RM',
+    name: 'Rajesh Mehta',
+    location: 'Mumbai · Radish & Broccoli',
+    rating: 5,
+    quote:
+      'I attended the webinar in early 2026. Within months I had established my commercial setup. Now I earn more than my previous IT job and work right from home.',
+  },
+  {
+    initials: 'AK',
+    name: 'Anita Krishnan',
+    location: 'Chennai · Wheatgrass & Lentils',
+    rating: 5,
+    quote:
+      'The most actionable webinar I have ever attended. Not just theory — real numbers, real strategies, real results. Completely free and worth every minute.',
+  },
+]
+
+export const DEFAULT_FAQS: FaqItemData[] = [
+  {
+    q: 'Is the webinar completely free?',
+    a: 'Yes, 100% free. There are no hidden fees or paywalls. We run this masterclass to share practical knowledge and grow the microgreens entrepreneurship community across India.',
+  },
+  {
+    q: 'Do I need any farming or agriculture experience?',
+    a: 'Absolutely not. The webinar is tailored from the ground up for complete beginners. If you can water a tray, you can grow high-yield microgreens.',
+  },
+  {
+    q: 'What equipment do I need to get started?',
+    a: 'Just trays, a growing medium (coco peat), non-GMO seeds, and water. A complete starter setup costs as little as ₹2,000–₹3,000, which we will cover step-by-step.',
+  },
+  {
+    q: 'How much space do I need in my home or apartment?',
+    a: 'As little as 10–20 square feet. A small apartment balcony, utility area, or a vertical wire rack inside a spare room works perfectly.',
+  },
+  {
+    q: 'Will the webinar recording be available?',
+    a: 'A replay will be shared with registered attendees. However, attending live allows you to ask questions directly in the live interactive Q&A and participate in live polls.',
+  },
+  {
+    q: 'How quickly can I make my first sale?',
+    a: 'Microgreens mature in 7–14 days. With our pre-order strategy, many attendees secure their first customer orders before even sowing their first tray.',
+  },
+  {
+    q: 'Is there a community I can join for support?',
+    a: 'Yes! After registering, you can join our active WhatsApp community with fellow growers sharing tips, harvest photos, and local business insights.',
+  },
+  {
+    q: 'Does this business model work in my city?',
+    a: 'Microgreens are in high demand across all Indian cities — Tier 1 metropolises as well as Tier 2 & Tier 3 towns with restaurants, cafes, and health-conscious families.',
+  },
+]
+
+export const DEFAULT_LANDING_PAGE_SETTINGS: LandingPageSettingsData = {
+  fallback_redirect_url: 'https://kravemicrogreens.in',
+  fallback_redirect_secs: 5,
+  fallback_title: 'No Live Webinar Scheduled At The Moment',
+  fallback_message:
+    'We are currently scheduling our next high-yield live masterclass. You will be redirected to our main website shortly.',
+  hero_headline_override: null,
+  hero_subheading_override: null,
+  hero_badge_text: 'FREE LIVE WEBINAR',
+  hero_social_proof_text: '2,000+ entrepreneurs already registered',
+  hero_primary_cta_text: '🎯 Reserve My Free Spot',
+  hero_secondary_cta_text: '💬 Join WhatsApp Community',
+  benefits: DEFAULT_BENEFITS,
+  testimonials: DEFAULT_TESTIMONIALS,
+  faqs: DEFAULT_FAQS,
+}
+
+export async function ensureLandingPageSettingsTable(db: D1Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS landing_page_settings (
+      id                        TEXT PRIMARY KEY,
+      tenant_id                 TEXT NOT NULL UNIQUE REFERENCES tenants (id) ON DELETE CASCADE,
+      fallback_redirect_url     TEXT NOT NULL DEFAULT 'https://kravemicrogreens.in',
+      fallback_redirect_secs    INTEGER NOT NULL DEFAULT 5,
+      fallback_title            TEXT NOT NULL DEFAULT 'No Live Webinar Scheduled At The Moment',
+      fallback_message          TEXT NOT NULL DEFAULT 'We are currently preparing our next live masterclass batch. You will be redirected to our main website shortly.',
+      hero_headline_override    TEXT,
+      hero_subheading_override  TEXT,
+      hero_badge_text           TEXT DEFAULT 'FREE LIVE WEBINAR',
+      hero_social_proof_text    TEXT DEFAULT '2,000+ entrepreneurs already registered',
+      hero_primary_cta_text     TEXT DEFAULT '🎯 Reserve My Free Spot',
+      hero_secondary_cta_text   TEXT DEFAULT '💬 Join WhatsApp Community',
+      benefits_json             TEXT NOT NULL DEFAULT '[]',
+      testimonials_json         TEXT NOT NULL DEFAULT '[]',
+      faqs_json                 TEXT NOT NULL DEFAULT '[]',
+      footer_links_json         TEXT NOT NULL DEFAULT '[]',
+      updated_at                DATETIME NOT NULL DEFAULT (datetime('now'))
+    );
+  `).catch(() => {})
+}
+
+export async function getLandingPageSettings(db: D1Database, tenantId: string): Promise<LandingPageSettingsData> {
+  try {
+    const row = await db
+      .prepare('SELECT * FROM landing_page_settings WHERE tenant_id = ? LIMIT 1')
       .bind(tenantId)
-      .first<DbWebinar>()
+      .first<any>()
+
+    if (!row) {
+      return DEFAULT_LANDING_PAGE_SETTINGS
+    }
+
+    let benefits = DEFAULT_BENEFITS
+    try {
+      if (row.benefits_json && row.benefits_json !== '[]') {
+        const parsed = JSON.parse(row.benefits_json)
+        if (Array.isArray(parsed) && parsed.length > 0) benefits = parsed
+      }
+    } catch {}
+
+    let testimonials = DEFAULT_TESTIMONIALS
+    try {
+      if (row.testimonials_json && row.testimonials_json !== '[]') {
+        const parsed = JSON.parse(row.testimonials_json)
+        if (Array.isArray(parsed) && parsed.length > 0) testimonials = parsed
+      }
+    } catch {}
+
+    let faqs = DEFAULT_FAQS
+    try {
+      if (row.faqs_json && row.faqs_json !== '[]') {
+        const parsed = JSON.parse(row.faqs_json)
+        if (Array.isArray(parsed) && parsed.length > 0) faqs = parsed
+      }
+    } catch {}
+
+    return {
+      fallback_redirect_url: row.fallback_redirect_url || DEFAULT_LANDING_PAGE_SETTINGS.fallback_redirect_url,
+      fallback_redirect_secs: row.fallback_redirect_secs ?? DEFAULT_LANDING_PAGE_SETTINGS.fallback_redirect_secs,
+      fallback_title: row.fallback_title || DEFAULT_LANDING_PAGE_SETTINGS.fallback_title,
+      fallback_message: row.fallback_message || DEFAULT_LANDING_PAGE_SETTINGS.fallback_message,
+      hero_headline_override: row.hero_headline_override || null,
+      hero_subheading_override: row.hero_subheading_override || null,
+      hero_badge_text: row.hero_badge_text || DEFAULT_LANDING_PAGE_SETTINGS.hero_badge_text,
+      hero_social_proof_text: row.hero_social_proof_text || DEFAULT_LANDING_PAGE_SETTINGS.hero_social_proof_text,
+      hero_primary_cta_text: row.hero_primary_cta_text || DEFAULT_LANDING_PAGE_SETTINGS.hero_primary_cta_text,
+      hero_secondary_cta_text: row.hero_secondary_cta_text || DEFAULT_LANDING_PAGE_SETTINGS.hero_secondary_cta_text,
+      benefits,
+      testimonials,
+      faqs,
+    }
+  } catch {
+    return DEFAULT_LANDING_PAGE_SETTINGS
+  }
+}
+
+export async function upsertLandingPageSettings(
+  db: D1Database,
+  tenantId: string,
+  patch: Partial<LandingPageSettingsData>,
+): Promise<LandingPageSettingsData> {
+  await ensureLandingPageSettingsTable(db)
+  const current = await getLandingPageSettings(db, tenantId)
+  const merged: LandingPageSettingsData = {
+    fallback_redirect_url: patch.fallback_redirect_url !== undefined ? patch.fallback_redirect_url : current.fallback_redirect_url,
+    fallback_redirect_secs: patch.fallback_redirect_secs !== undefined ? patch.fallback_redirect_secs : current.fallback_redirect_secs,
+    fallback_title: patch.fallback_title !== undefined ? patch.fallback_title : current.fallback_title,
+    fallback_message: patch.fallback_message !== undefined ? patch.fallback_message : current.fallback_message,
+    hero_headline_override: patch.hero_headline_override !== undefined ? patch.hero_headline_override : current.hero_headline_override,
+    hero_subheading_override: patch.hero_subheading_override !== undefined ? patch.hero_subheading_override : current.hero_subheading_override,
+    hero_badge_text: patch.hero_badge_text !== undefined ? patch.hero_badge_text : current.hero_badge_text,
+    hero_social_proof_text: patch.hero_social_proof_text !== undefined ? patch.hero_social_proof_text : current.hero_social_proof_text,
+    hero_primary_cta_text: patch.hero_primary_cta_text !== undefined ? patch.hero_primary_cta_text : current.hero_primary_cta_text,
+    hero_secondary_cta_text: patch.hero_secondary_cta_text !== undefined ? patch.hero_secondary_cta_text : current.hero_secondary_cta_text,
+    benefits: patch.benefits !== undefined ? patch.benefits : current.benefits,
+    testimonials: patch.testimonials !== undefined ? patch.testimonials : current.testimonials,
+    faqs: patch.faqs !== undefined ? patch.faqs : current.faqs,
   }
 
-  return webinar ?? null
+  const id = generateULID()
+  await db
+    .prepare(`
+      INSERT INTO landing_page_settings (
+        id, tenant_id, fallback_redirect_url, fallback_redirect_secs,
+        fallback_title, fallback_message, hero_headline_override, hero_subheading_override,
+        hero_badge_text, hero_social_proof_text, hero_primary_cta_text, hero_secondary_cta_text,
+        benefits_json, testimonials_json, faqs_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(tenant_id) DO UPDATE SET
+        fallback_redirect_url = excluded.fallback_redirect_url,
+        fallback_redirect_secs = excluded.fallback_redirect_secs,
+        fallback_title = excluded.fallback_title,
+        fallback_message = excluded.fallback_message,
+        hero_headline_override = excluded.hero_headline_override,
+        hero_subheading_override = excluded.hero_subheading_override,
+        hero_badge_text = excluded.hero_badge_text,
+        hero_social_proof_text = excluded.hero_social_proof_text,
+        hero_primary_cta_text = excluded.hero_primary_cta_text,
+        hero_secondary_cta_text = excluded.hero_secondary_cta_text,
+        benefits_json = excluded.benefits_json,
+        testimonials_json = excluded.testimonials_json,
+        faqs_json = excluded.faqs_json,
+        updated_at = datetime('now')
+    `)
+    .bind(
+      id,
+      tenantId,
+      merged.fallback_redirect_url,
+      merged.fallback_redirect_secs,
+      merged.fallback_title,
+      merged.fallback_message,
+      merged.hero_headline_override,
+      merged.hero_subheading_override,
+      merged.hero_badge_text,
+      merged.hero_social_proof_text,
+      merged.hero_primary_cta_text,
+      merged.hero_secondary_cta_text,
+      JSON.stringify(merged.benefits),
+      JSON.stringify(merged.testimonials),
+      JSON.stringify(merged.faqs),
+    )
+    .run()
+
+  return merged
 }
 
 // ── Phase 11: Leads helpers ───────────────────────────────────────
