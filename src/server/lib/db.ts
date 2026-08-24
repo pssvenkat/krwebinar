@@ -2225,28 +2225,6 @@ export async function deleteUser(db: D1Database, userId: string): Promise<void> 
 
 // ── DPDP Consent Records & Data Erasure Helpers ────────────────────
 
-export async function ensureDpdpErasureRequestsTable(db: D1Database): Promise<void> {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS dpdp_erasure_requests (
-      id                TEXT PRIMARY KEY,
-      tenant_id         TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-      email             TEXT,
-      phone             TEXT,
-      reason            TEXT,
-      status            TEXT NOT NULL DEFAULT 'PENDING'
-                        CHECK (status IN ('PENDING', 'COMPLETED', 'REJECTED')),
-      ip_address        TEXT,
-      user_agent        TEXT,
-      created_at        DATETIME NOT NULL DEFAULT (datetime('now')),
-      processed_at      DATETIME,
-      processed_by      TEXT,
-      resolution_notes  TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_dpdp_tenant_status ON dpdp_erasure_requests (tenant_id, status);
-    CREATE INDEX IF NOT EXISTS idx_dpdp_tenant_email  ON dpdp_erasure_requests (tenant_id, email);
-  `)
-}
-
 export async function listConsentRecords(
   db: D1Database,
   tenantId: string,
@@ -2441,7 +2419,6 @@ export async function createDpdpErasureRequest(
     userAgent?: string | null
   },
 ): Promise<DbDpdpErasureRequest> {
-  await ensureDpdpErasureRequestsTable(db)
   const id = generateULID()
   const now = new Date().toISOString()
   const cleanEmail = data.email?.toLowerCase().trim() || null
@@ -2474,7 +2451,6 @@ export async function getDpdpErasureRequestById(
   tenantId: string,
   requestId: string,
 ): Promise<DbDpdpErasureRequest | null> {
-  await ensureDpdpErasureRequestsTable(db)
   const result = await db
     .prepare('SELECT * FROM dpdp_erasure_requests WHERE tenant_id = ? AND id = ? LIMIT 1')
     .bind(tenantId, requestId)
@@ -2487,7 +2463,6 @@ export async function listDpdpErasureRequests(
   tenantId: string,
   options: { status?: string; limit?: number; offset?: number } = {},
 ): Promise<{ requests: DbDpdpErasureRequest[]; total: number; pendingCount: number }> {
-  await ensureDpdpErasureRequestsTable(db)
   const { status, limit = 50, offset = 0 } = options
 
   const conditions = ['tenant_id = ?']
