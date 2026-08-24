@@ -4,16 +4,17 @@ import { Suspense, lazy } from 'react'
 // Public pages
 import HomePage from './pages/public/HomePage'
 import NotFoundPage from './pages/public/NotFoundPage'
+import WebinarLandingPage from './pages/public/WebinarLandingPage'
 
 // Admin pages
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 
-// Auth guard
+// Auth guard & Error Boundary
 import RequireAuth from './components/RequireAuth'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Phase 4: Registration flow (lazy-loaded)
-const WebinarLandingPage      = lazy(() => import('./pages/public/WebinarLandingPage'))
 const RegisterPage            = lazy(() => import('./pages/public/RegisterPage'))
 const AttendPage              = lazy(() => import('./pages/attend/AttendPage'))
 const FeedbackPage            = lazy(() => import('./pages/public/FeedbackPage'))
@@ -65,14 +66,15 @@ export default function App() {
   useBranding()
 
   return (
-    <BrowserRouter>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          {/* ── Public routes ── */}
-          <Route path="/" element={<WebinarLandingPage />} />
-          <Route path="/landing" element={<WebinarLandingPage />} />
-          <Route path="/landing/:id" element={<WebinarLandingPage />} />
-          <Route path="/home" element={<HomePage />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            {/* ── Public routes ── */}
+            <Route path="/" element={<WebinarLandingPage />} />
+            <Route path="/landing" element={<WebinarLandingPage />} />
+            <Route path="/landing/:id" element={<WebinarLandingPage />} />
+            <Route path="/home" element={<HomePage />} />
 
           {/* ── Registration flow ── */}
           <Route path="/register" element={<RegisterPage />} />
@@ -139,5 +141,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }

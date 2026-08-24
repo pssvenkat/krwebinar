@@ -464,115 +464,116 @@ export default function WebinarLandingPage() {
   const primaryCtaText = config?.hero_primary_cta_text || '🎯 Reserve My Free Spot'
   const secondaryCtaText = config?.hero_secondary_cta_text || '💬 Join WhatsApp Community'
 
-  const learningPoints =
-    config?.benefits && config.benefits.length > 0
-      ? config.benefits
-      : [
-          {
-            icon: '🌱',
-            num: '1',
-            title: 'Start with Zero Experience',
-            desc: 'No farming background needed. Our proven step-by-step system is engineered for complete beginners.',
-          },
-          {
-            icon: '💰',
-            num: '2',
-            title: 'Earn ₹25,000–₹50,000/Month',
-            desc: 'Learn exactly how to price, sell, and scale to a reliable full-time income from fresh microgreens.',
-          },
-          {
-            icon: '📦',
-            num: '3',
-            title: 'Sell Before You Grow',
-            desc: 'Discover our pre-order strategy so you have paying customers before spending a single rupee on seeds.',
-          },
-          {
-            icon: '🏠',
-            num: '4',
-            title: 'Grow From Any Space',
-            desc: 'A balcony, terrace, or spare corner is enough. No heavy land or expensive greenhouse required.',
-          },
-          {
-            icon: '⚡',
-            num: '5',
-            title: 'Harvest in 7–14 Days',
-            desc: 'Microgreens are the fastest-growing crop on earth. Get your first harvest and revenue within 2 weeks.',
-          },
-          {
-            icon: '🎯',
-            num: '6',
-            title: 'Live Q&A with Trainer',
-            desc: 'Get your specific questions answered live and leave with a personalized, actionable launch plan.',
-          },
-        ]
+  const learningPoints: BenefitItem[] = Array.isArray(config?.benefits) && config.benefits.length > 0
+    ? config.benefits
+    : [
+        {
+          icon: '🌱',
+          num: '1',
+          title: 'Start with Zero Experience',
+          desc: 'No farming background needed. Our proven step-by-step system is engineered for complete beginners.',
+        },
+        {
+          icon: '💰',
+          num: '2',
+          title: 'Earn ₹25,000–₹50,000/Month',
+          desc: 'Learn exactly how to price, sell, and scale to a reliable full-time income from fresh microgreens.',
+        },
+        {
+          icon: '📦',
+          num: '3',
+          title: 'Sell Before You Grow',
+          desc: 'Discover our pre-order strategy so you have paying customers before spending a single rupee on seeds.',
+        },
+        {
+          icon: '🏠',
+          num: '4',
+          title: 'Grow From Any Space',
+          desc: 'A balcony, terrace, or spare corner is enough. No heavy land or expensive greenhouse required.',
+        },
+        {
+          icon: '⚡',
+          num: '5',
+          title: 'Harvest in 7–14 Days',
+          desc: 'Microgreens are the fastest-growing crop on earth. Get your first harvest and revenue within 2 weeks.',
+        },
+        {
+          icon: '🎯',
+          num: '6',
+          title: 'Live Q&A with Trainer',
+          desc: 'Get your specific questions answered live and leave with a personalized, actionable launch plan.',
+        },
+      ]
 
-  const testimonials =
-    config?.testimonials && config.testimonials.length > 0
-      ? config.testimonials
-      : [
-          {
-            initials: 'PS',
-            name: 'Priya Sharma',
-            location: 'Bengaluru · Sunflower & Pea shoots',
-            rating: 5,
-            quote:
-              'I was skeptical at first, but within 6 weeks of following the system I had my first ₹18,000 month. The webinar gave me the confidence to start immediately.',
-          },
-          {
-            initials: 'RM',
-            name: 'Rajesh Mehta',
-            location: 'Mumbai · Radish & Broccoli',
-            rating: 5,
-            quote:
-              'I attended the webinar in early 2026. Within months I had established my commercial setup. Now I earn more than my previous IT job and work right from home.',
-          },
-          {
-            initials: 'AK',
-            name: 'Anita Krishnan',
-            location: 'Chennai · Wheatgrass & Lentils',
-            rating: 5,
-            quote:
-              'The most actionable webinar I have ever attended. Not just theory — real numbers, real strategies, real results. Completely free and worth every minute.',
-          },
-        ]
+  const testimonials: TestimonialItem[] = Array.isArray(config?.testimonials) && config.testimonials.length > 0
+    ? config.testimonials
+    : [
+        {
+          initials: 'PS',
+          name: 'Priya Sharma',
+          location: 'Bengaluru · Sunflower & Pea shoots',
+          rating: 5,
+          quote:
+            'I was skeptical at first, but within 6 weeks of following the system I had my first ₹18,000 month. The webinar gave me the confidence to start immediately.',
+        },
+        {
+          initials: 'RM',
+          name: 'Rajesh Mehta',
+          location: 'Mumbai · Radish & Broccoli',
+          rating: 5,
+          quote:
+            'I attended the webinar in early 2026. Within months I had established my commercial setup. Now I earn more than my previous IT job and work right from home.',
+        },
+        {
+          initials: 'AK',
+          name: 'Anita Krishnan',
+          location: 'Chennai · Wheatgrass & Lentils',
+          rating: 5,
+          quote:
+            'The most actionable webinar I have ever attended. Not just theory — real numbers, real strategies, real results. Completely free and worth every minute.',
+        },
+      ]
 
-  const faqs =
-    config?.faqs && config.faqs.length > 0
-      ? config.faqs
-      : [
-          {
-            q: 'Is the webinar completely free?',
-            a: 'Yes, 100% free. There are no hidden fees or paywalls. We run this masterclass to share practical knowledge and grow the microgreens entrepreneurship community across India.',
-          },
-          {
-            q: 'Do I need any farming or agriculture experience?',
-            a: 'Absolutely not. The webinar is tailored from the ground up for complete beginners. If you can water a tray, you can grow high-yield microgreens.',
-          },
-          {
-            q: 'What equipment do I need to get started?',
-            a: 'Just trays, a growing medium (coco peat), non-GMO seeds, and water. A complete starter setup costs as little as ₹2,000–₹3,000, which we will cover step-by-step.',
-          },
-          {
-            q: 'How much space do I need in my home or apartment?',
-            a: 'As little as 10–20 square feet. A small apartment balcony, utility area, or a vertical wire rack inside a spare room works perfectly.',
-          },
-          {
-            q: 'Will the webinar recording be available?',
-            a: 'A replay will be shared with registered attendees. However, attending live allows you to ask questions directly in the live interactive Q&A and participate in live polls.',
-          },
-          {
-            q: 'How quickly can I make my first sale?',
-            a: 'Microgreens mature in 7–14 days. With our pre-order strategy, many attendees secure their first customer orders before even sowing their first tray.',
-          },
-          {
-            q: 'Is there a community I can join for support?',
-            a: 'Yes! After registering, you can join our active WhatsApp community with fellow growers sharing tips, harvest photos, and local business insights.',
-          },
-          {
-            q: 'Does this business model work in my city?',
-            a: 'Microgreens are in high demand across all Indian cities — Tier 1 metropolises as well as Tier 2 & Tier 3 towns with restaurants, cafes, and health-conscious families.',
-          },
-        ]
+  const faqs: FaqItemData[] = Array.isArray(config?.faqs) && config.faqs.length > 0
+    ? config.faqs
+    : [
+        {
+          q: 'Is the webinar completely free?',
+          a: 'Yes, 100% free. There are no hidden fees or paywalls. We run this masterclass to share practical knowledge and grow the microgreens entrepreneurship community across India.',
+        },
+        {
+          q: 'Do I need any farming or agriculture experience?',
+          a: 'Absolutely not. The webinar is tailored from the ground up for complete beginners. If you can water a tray, you can grow high-yield microgreens.',
+        },
+        {
+          q: 'What equipment do I need to get started?',
+          a: 'Just trays, a growing medium (coco peat), non-GMO seeds, and water. A complete starter setup costs as little as ₹2,000–₹3,000, which we will cover step-by-step.',
+        },
+        {
+          q: 'How much space do I need in my home or apartment?',
+          a: 'As little as 10–20 square feet. A small apartment balcony, utility area, or a vertical wire rack inside a spare room works perfectly.',
+        },
+        {
+          q: 'Will the webinar recording be available?',
+          a: 'A replay will be shared with registered attendees. However, attending live allows you to ask questions directly in the live interactive Q&A and participate in live polls.',
+        },
+        {
+          q: 'How quickly can I make my first sale?',
+          a: 'Microgreens mature in 7–14 days. With our pre-order strategy, many attendees secure their first customer orders before even sowing their first tray.',
+        },
+        {
+          q: 'Is there a community I can join for support?',
+          a: 'Yes! After registering, you can join our active WhatsApp community with fellow growers sharing tips, harvest photos, and local business insights.',
+        },
+        {
+          q: 'Does this business model work in my city?',
+          a: 'Microgreens are in high demand across all Indian cities — Tier 1 metropolises as well as Tier 2 & Tier 3 towns with restaurants, cafes, and health-conscious families.',
+        },
+      ]
+
+  const trainerHighlights: string[] = Array.isArray(trainer?.highlights) && trainer.highlights.length > 0
+    ? trainer.highlights
+    : ['2,000+ students trained', 'Microgreens Pioneer in Coimbatore', 'Commercial & Home Setup Expert']
 
   return (
     <div style={{ fontFamily: 'var(--font-body, Inter, system-ui, sans-serif)', color: '#143623', background: '#f8faf5', minHeight: '100vh' }}>
@@ -1104,10 +1105,7 @@ export default function WebinarLandingPage() {
               </p>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                {(trainer?.highlights && trainer.highlights.length > 0
-                  ? trainer.highlights
-                  : ['2,000+ students trained', 'Microgreens Pioneer in Coimbatore', 'Commercial & Home Setup Expert']
-                ).map((h: string, i: number) => (
+                {trainerHighlights.map((h: string, i: number) => (
                   <div
                     key={i}
                     style={{
