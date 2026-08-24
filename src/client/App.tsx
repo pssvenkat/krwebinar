@@ -18,6 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 const RegisterPage            = lazy(() => import('./pages/public/RegisterPage'))
 const AttendPage              = lazy(() => import('./pages/attend/AttendPage'))
 const FeedbackPage            = lazy(() => import('./pages/public/FeedbackPage'))
+const PublicDpdpErasurePage   = lazy(() => import('./pages/public/PublicDpdpErasurePage'))
 
 // Phase 5: Admin pages (lazy-loaded)
 const AdminLoginPage             = lazy(() => import('./pages/admin/AdminLoginPage'))
@@ -76,13 +77,17 @@ export default function App() {
             <Route path="/landing/:id" element={<WebinarLandingPage />} />
             <Route path="/home" element={<HomePage />} />
 
-          {/* ── Registration flow ── */}
+          {/* ── Registration & Public privacy flow ── */}
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/register/:webinarId" element={<RegisterPage />} />
           <Route path="/w/:token" element={<AttendPage />} />
           <Route path="/attend/:token" element={<AttendPage />} />
           <Route path="/live/:token" element={<AttendPage />} />
           <Route path="/w/:token/feedback" element={<FeedbackPage />} />
+          <Route path="/privacy/request-deletion" element={<PublicDpdpErasurePage />} />
+          <Route path="/privacy/erasure" element={<PublicDpdpErasurePage />} />
+          <Route path="/dpdp-request" element={<PublicDpdpErasurePage />} />
+          <Route path="/dpdp/request-erasure" element={<PublicDpdpErasurePage />} />
 
           {/* ── Admin login (unguarded) ── */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -115,6 +120,7 @@ export default function App() {
             <Route path="branding" element={<AdminBrandingPage />} />
             <Route path="domains" element={<AdminDomainsPage />} />
             <Route path="privacy" element={<AdminPrivacyPage />} />
+            <Route path="consent" element={<AdminPrivacyPage />} />
           </Route>
 
           {/* ── Phase 12 & 14: Platform admin routes (PLATFORM_OWNER) ── */}

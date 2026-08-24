@@ -1349,6 +1349,10 @@ export default function WebinarLandingPage() {
                 Privacy Policy
               </a>
               <span>·</span>
+              <Link to="/privacy/request-deletion" style={{ color: 'inherit', textDecoration: 'none' }}>
+                Data Deletion (DPDP)
+              </Link>
+              <span>·</span>
               <a href="https://kravemicrogreens.in/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
                 Terms
               </a>

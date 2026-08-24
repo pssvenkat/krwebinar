@@ -13,9 +13,11 @@ import { landingAdminRoutes } from './routes/admin/landing'
 import { leadsRoutes } from './routes/admin/leads'
 import { domainRoutes } from './routes/admin/domains'
 import { adminUserRoutes } from './routes/admin/users'
+import { privacyAdminRoutes } from './routes/admin/privacy'
 import { platformRoutes } from './routes/platform/tenants'
 import { platformUserRoutes } from './routes/platform/users'
 import { publicWebinarRoutes } from './routes/public/webinar'
+import { privacyPublicRoutes } from './routes/public/privacy'
 import { unsubscribeRoutes } from './routes/public/unsubscribe'
 import { wsRoutes } from './routes/attend/ws'
 import { tenantMiddleware } from './middleware/tenant'
@@ -95,6 +97,7 @@ app.route('/api/v1', landingAdminRoutes) // serves /api/v1/public/landing-config
 app.route('/api/v1/admin', leadsRoutes)
 app.route('/api/v1/admin/domains', domainRoutes)
 app.route('/api/v1/admin/users', adminUserRoutes)
+app.route('/api/v1/admin/privacy', privacyAdminRoutes)
 
 // Platform admin (PLATFORM_OWNER only — no tenant middleware)
 app.route('/api/platform', platformRoutes)
@@ -104,6 +107,8 @@ app.route('/api/v1/platform/users', platformUserRoutes)
 
 // Public routes (no auth — tenant-scoped only)
 app.route('/api/v1/webinars', publicWebinarRoutes)
+app.route('/api/v1/privacy', privacyPublicRoutes)
+app.route('/api/v1/public/privacy', privacyPublicRoutes)
 app.route('/api/v1', publicWebinarRoutes)
 
 // WebSocket routes (tenant-scoped — attendee token or JWT validated inside)

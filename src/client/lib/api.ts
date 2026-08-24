@@ -242,6 +242,60 @@ export const api = {
     delete: (id: string) =>
       _fetch<{ message: string }>(`/platform/users/${id}`, { method: 'DELETE' }),
   },
+
+  // Privacy, Consent & DPDP Compliance
+  privacy: {
+    getConsents: (params?: { search?: string; consentType?: string; granted?: number; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.search) q.set('search', params.search)
+      if (params?.consentType && params.consentType !== 'ALL') q.set('consentType', params.consentType)
+      if (params?.granted !== undefined) q.set('granted', String(params.granted))
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      const qs = q.toString()
+      return _fetch<{
+        records: ConsentRecordItem[]
+        pagination: { page: number; limit: number; total: number; totalPages: number }
+      }>(`/admin/privacy/consents${qs ? `?${qs}` : ''}`)
+    },
+    purgeUser: (data: { email?: string; phone?: string }) =>
+      _fetch<{ message: string; result: PurgeResultData }>('/admin/privacy/purge-user', {
+        method: 'DELETE',
+        body: data,
+      }),
+    getErasureRequests: (params?: { status?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.status && params.status !== 'ALL') q.set('status', params.status)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      const qs = q.toString()
+      return _fetch<{
+        requests: DpdpErasureRequestItem[]
+        pendingCount: number
+        pagination: { page: number; limit: number; total: number; totalPages: number }
+      }>(`/admin/privacy/erasure-requests${qs ? `?${qs}` : ''}`)
+    },
+    approveErasureRequest: (id: string, notes?: string) =>
+      _fetch<{ message: string; request: DpdpErasureRequestItem; purgeResult?: PurgeResultData }>(
+        `/admin/privacy/erasure-requests/${id}/approve`,
+        { method: 'POST', body: { notes } },
+      ),
+    rejectErasureRequest: (id: string, notes?: string) =>
+      _fetch<{ message: string; request: DpdpErasureRequestItem }>(
+        `/admin/privacy/erasure-requests/${id}/reject`,
+        { method: 'POST', body: { notes } },
+      ),
+    submitPublicErasureRequest: (data: {
+      email?: string
+      phone?: string
+      reason?: string
+      cfTurnstileToken?: string
+    }) =>
+      _fetch<{ message: string; requestId: string; status: string; submittedAt: string }>(
+        '/privacy/erasure-request',
+        { method: 'POST', body: data },
+      ),
+  },
 }
 
 export interface ManagedUser {
@@ -428,4 +482,43 @@ export interface LeadsSummary {
   avgRating: number | null
   contactRequested: number
   ratingCounts: { rating: number; count: number }[]
+}
+
+export interface ConsentRecordItem {
+  id: string
+  tenant_id: string
+  subject_email: string
+  subject_phone: string | null
+  consent_type: 'necessary' | 'marketing' | 'analytics' | 'contact'
+  granted: number
+  ip_address: string | null
+  user_agent: string | null
+  source_url: string | null
+  legal_basis: string
+  recorded_at: string
+}
+
+export interface DpdpErasureRequestItem {
+  id: string
+  tenant_id: string
+  email: string | null
+  phone: string | null
+  reason: string | null
+  status: 'PENDING' | 'COMPLETED' | 'REJECTED'
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  processed_at: string | null
+  processed_by: string | null
+  resolution_notes: string | null
+}
+
+export interface PurgeResultData {
+  email?: string
+  phone?: string
+  deletedRegistrations: number
+  deletedLeads: number
+  deletedFeedbacks: number
+  deletedConsents: number
+  totalDeleted: number
 }

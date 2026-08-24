@@ -16,6 +16,8 @@ import type {
   DbTenantSettings,
   DbRegistration,
   DbLeadCapture,
+  DbConsentRecord,
+  DbDpdpErasureRequest,
 } from '../types'
 
 // ── ULID generation (no npm dep) ──────────────────────────────────
@@ -2219,4 +2221,373 @@ export async function updateUserPassword(
 
 export async function deleteUser(db: D1Database, userId: string): Promise<void> {
   await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run()
+}
+
+// ── DPDP Consent Records & Data Erasure Helpers ────────────────────
+
+export async function ensureDpdpErasureRequestsTable(db: D1Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS dpdp_erasure_requests (
+      id                TEXT PRIMARY KEY,
+      tenant_id         TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+      email             TEXT,
+      phone             TEXT,
+      reason            TEXT,
+      status            TEXT NOT NULL DEFAULT 'PENDING'
+                        CHECK (status IN ('PENDING', 'COMPLETED', 'REJECTED')),
+      ip_address        TEXT,
+      user_agent        TEXT,
+      created_at        DATETIME NOT NULL DEFAULT (datetime('now')),
+      processed_at      DATETIME,
+      processed_by      TEXT,
+      resolution_notes  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_dpdp_tenant_status ON dpdp_erasure_requests (tenant_id, status);
+    CREATE INDEX IF NOT EXISTS idx_dpdp_tenant_email  ON dpdp_erasure_requests (tenant_id, email);
+  `)
+}
+
+export async function listConsentRecords(
+  db: D1Database,
+  tenantId: string,
+  options: {
+    search?: string
+    consentType?: string
+    granted?: number
+    limit?: number
+    offset?: number
+  } = {},
+): Promise<DbConsentRecord[]> {
+  const { search, consentType, granted, limit = 50, offset = 0 } = options
+  const conditions: string[] = ['tenant_id = ?']
+  const binds: (string | number)[] = [tenantId]
+
+  if (search) {
+    conditions.push('(LOWER(subject_email) LIKE ? OR subject_phone LIKE ?)')
+    const pattern = `%${search.toLowerCase().trim()}%`
+    binds.push(pattern, pattern)
+  }
+
+  if (consentType && consentType !== 'ALL') {
+    conditions.push('consent_type = ?')
+    binds.push(consentType)
+  }
+
+  if (granted !== undefined) {
+    conditions.push('granted = ?')
+    binds.push(granted)
+  }
+
+  const query = `
+    SELECT * FROM consent_records
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY recorded_at DESC
+    LIMIT ? OFFSET ?
+  `
+  binds.push(limit, offset)
+
+  const result = await db.prepare(query).bind(...binds).all<DbConsentRecord>()
+  return result.results ?? []
+}
+
+export async function countConsentRecords(
+  db: D1Database,
+  tenantId: string,
+  options: {
+    search?: string
+    consentType?: string
+    granted?: number
+  } = {},
+): Promise<number> {
+  const { search, consentType, granted } = options
+  const conditions: string[] = ['tenant_id = ?']
+  const binds: (string | number)[] = [tenantId]
+
+  if (search) {
+    conditions.push('(LOWER(subject_email) LIKE ? OR subject_phone LIKE ?)')
+    const pattern = `%${search.toLowerCase().trim()}%`
+    binds.push(pattern, pattern)
+  }
+
+  if (consentType && consentType !== 'ALL') {
+    conditions.push('consent_type = ?')
+    binds.push(consentType)
+  }
+
+  if (granted !== undefined) {
+    conditions.push('granted = ?')
+    binds.push(granted)
+  }
+
+  const query = `SELECT COUNT(*) as count FROM consent_records WHERE ${conditions.join(' AND ')}`
+  const result = await db.prepare(query).bind(...binds).first<{ count: number }>()
+  return result?.count ?? 0
+}
+
+export interface PurgeResult {
+  email?: string
+  phone?: string
+  deletedRegistrations: number
+  deletedLeads: number
+  deletedFeedbacks: number
+  deletedConsents: number
+  totalDeleted: number
+}
+
+/**
+ * Purge all personal data (PII) for an attendee across all tenant tables
+ * under DPDP Act 2023 / GDPR Right to Erasure.
+ */
+export async function purgeTenantUserData(
+  db: D1Database,
+  tenantId: string,
+  target: { email?: string | null; phone?: string | null },
+): Promise<PurgeResult> {
+  const cleanEmail = target.email?.toLowerCase().trim() || null
+  const cleanPhone = target.phone?.trim() || null
+
+  if (!cleanEmail && !cleanPhone) {
+    throw new Error('At least one identifier (email or phone) is required to purge data')
+  }
+
+  // 1. Delete feedbacks associated with registrations or attendee email
+  let deletedFeedbacks = 0
+  if (cleanEmail) {
+    const fbRes = await db
+      .prepare('DELETE FROM feedbacks WHERE tenant_id = ? AND LOWER(attendee_email) = ?')
+      .bind(tenantId, cleanEmail)
+      .run()
+    deletedFeedbacks += fbRes.meta?.changes ?? 0
+  }
+
+  // 2. Delete registrations for this tenant
+  let deletedRegistrations = 0
+  if (cleanEmail && cleanPhone) {
+    const regRes = await db
+      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND (LOWER(email) = ? OR phone_e164 = ?)')
+      .bind(tenantId, cleanEmail, cleanPhone)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  } else if (cleanEmail) {
+    const regRes = await db
+      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND LOWER(email) = ?')
+      .bind(tenantId, cleanEmail)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  } else if (cleanPhone) {
+    const regRes = await db
+      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND phone_e164 = ?')
+      .bind(tenantId, cleanPhone)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  }
+
+  // 3. Delete lead captures for this tenant
+  let deletedLeads = 0
+  if (cleanEmail && cleanPhone) {
+    const leadRes = await db
+      .prepare('DELETE FROM lead_captures WHERE tenant_id = ? AND (LOWER(email) = ? OR phone_e164 = ?)')
+      .bind(tenantId, cleanEmail, cleanPhone)
+      .run()
+    deletedLeads = leadRes.meta?.changes ?? 0
+  } else if (cleanEmail) {
+    const leadRes = await db
+      .prepare('DELETE FROM lead_captures WHERE tenant_id = ? AND LOWER(email) = ?')
+      .bind(tenantId, cleanEmail)
+      .run()
+    deletedLeads = leadRes.meta?.changes ?? 0
+  } else if (cleanPhone) {
+    const leadRes = await db
+      .prepare('DELETE FROM lead_captures WHERE tenant_id = ? AND phone_e164 = ?')
+      .bind(tenantId, cleanPhone)
+      .run()
+    deletedLeads = leadRes.meta?.changes ?? 0
+  }
+
+  // 4. Delete consent records for this tenant
+  let deletedConsents = 0
+  if (cleanEmail && cleanPhone) {
+    const conRes = await db
+      .prepare('DELETE FROM consent_records WHERE tenant_id = ? AND (LOWER(subject_email) = ? OR subject_phone = ?)')
+      .bind(tenantId, cleanEmail, cleanPhone)
+      .run()
+    deletedConsents = conRes.meta?.changes ?? 0
+  } else if (cleanEmail) {
+    const conRes = await db
+      .prepare('DELETE FROM consent_records WHERE tenant_id = ? AND LOWER(subject_email) = ?')
+      .bind(tenantId, cleanEmail)
+      .run()
+    deletedConsents = conRes.meta?.changes ?? 0
+  } else if (cleanPhone) {
+    const conRes = await db
+      .prepare('DELETE FROM consent_records WHERE tenant_id = ? AND subject_phone = ?')
+      .bind(tenantId, cleanPhone)
+      .run()
+    deletedConsents = conRes.meta?.changes ?? 0
+  }
+
+  const totalDeleted = deletedRegistrations + deletedLeads + deletedFeedbacks + deletedConsents
+
+  return {
+    email: cleanEmail ?? undefined,
+    phone: cleanPhone ?? undefined,
+    deletedRegistrations,
+    deletedLeads,
+    deletedFeedbacks,
+    deletedConsents,
+    totalDeleted,
+  }
+}
+
+export async function createDpdpErasureRequest(
+  db: D1Database,
+  tenantId: string,
+  data: {
+    email?: string | null
+    phone?: string | null
+    reason?: string | null
+    ipAddress?: string | null
+    userAgent?: string | null
+  },
+): Promise<DbDpdpErasureRequest> {
+  await ensureDpdpErasureRequestsTable(db)
+  const id = generateULID()
+  const now = new Date().toISOString()
+  const cleanEmail = data.email?.toLowerCase().trim() || null
+  const cleanPhone = data.phone?.trim() || null
+
+  await db
+    .prepare(`
+      INSERT INTO dpdp_erasure_requests (
+        id, tenant_id, email, phone, reason, status,
+        ip_address, user_agent, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)
+    `)
+    .bind(
+      id,
+      tenantId,
+      cleanEmail,
+      cleanPhone,
+      data.reason ?? 'Right to be forgotten requested under DPDP Act 2023',
+      data.ipAddress ?? null,
+      data.userAgent ?? null,
+      now,
+    )
+    .run()
+
+  return (await getDpdpErasureRequestById(db, tenantId, id))!
+}
+
+export async function getDpdpErasureRequestById(
+  db: D1Database,
+  tenantId: string,
+  requestId: string,
+): Promise<DbDpdpErasureRequest | null> {
+  await ensureDpdpErasureRequestsTable(db)
+  const result = await db
+    .prepare('SELECT * FROM dpdp_erasure_requests WHERE tenant_id = ? AND id = ? LIMIT 1')
+    .bind(tenantId, requestId)
+    .first<DbDpdpErasureRequest>()
+  return result ?? null
+}
+
+export async function listDpdpErasureRequests(
+  db: D1Database,
+  tenantId: string,
+  options: { status?: string; limit?: number; offset?: number } = {},
+): Promise<{ requests: DbDpdpErasureRequest[]; total: number; pendingCount: number }> {
+  await ensureDpdpErasureRequestsTable(db)
+  const { status, limit = 50, offset = 0 } = options
+
+  const conditions = ['tenant_id = ?']
+  const binds: (string | number)[] = [tenantId]
+
+  if (status && status !== 'ALL') {
+    conditions.push('status = ?')
+    binds.push(status)
+  }
+
+  const query = `
+    SELECT * FROM dpdp_erasure_requests
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `
+  binds.push(limit, offset)
+
+  const [reqs, totalRes, pendingRes] = await Promise.all([
+    db.prepare(query).bind(...binds).all<DbDpdpErasureRequest>(),
+    db
+      .prepare(`SELECT COUNT(*) as c FROM dpdp_erasure_requests WHERE ${conditions.join(' AND ')}`)
+      .bind(...binds.slice(0, binds.length - 2))
+      .first<{ c: number }>(),
+    db
+      .prepare("SELECT COUNT(*) as c FROM dpdp_erasure_requests WHERE tenant_id = ? AND status = 'PENDING'")
+      .bind(tenantId)
+      .first<{ c: number }>(),
+  ])
+
+  return {
+    requests: reqs.results ?? [],
+    total: totalRes?.c ?? 0,
+    pendingCount: pendingRes?.c ?? 0,
+  }
+}
+
+export async function processDpdpErasureRequest(
+  db: D1Database,
+  tenantId: string,
+  requestId: string,
+  action: 'APPROVE' | 'REJECT',
+  adminUserId: string,
+  notes?: string,
+): Promise<{ request: DbDpdpErasureRequest; purgeResult?: PurgeResult }> {
+  const existing = await getDpdpErasureRequestById(db, tenantId, requestId)
+  if (!existing) {
+    throw new Error('Erasure request not found')
+  }
+
+  const now = new Date().toISOString()
+  let purgeResult: PurgeResult | undefined
+
+  if (action === 'APPROVE') {
+    // Purge the data
+    purgeResult = await purgeTenantUserData(db, tenantId, {
+      email: existing.email,
+      phone: existing.phone,
+    })
+
+    await db
+      .prepare(`
+        UPDATE dpdp_erasure_requests
+        SET status = 'COMPLETED',
+            processed_at = ?,
+            processed_by = ?,
+            resolution_notes = ?
+        WHERE tenant_id = ? AND id = ?
+      `)
+      .bind(
+        now,
+        adminUserId,
+        notes || `Approved by admin. Erased ${purgeResult.totalDeleted} record(s).`,
+        tenantId,
+        requestId,
+      )
+      .run()
+  } else {
+    await db
+      .prepare(`
+        UPDATE dpdp_erasure_requests
+        SET status = 'REJECTED',
+            processed_at = ?,
+            processed_by = ?,
+            resolution_notes = ?
+        WHERE tenant_id = ? AND id = ?
+      `)
+      .bind(now, adminUserId, notes || 'Rejected by administrator', tenantId, requestId)
+      .run()
+  }
+
+  const updated = await getDpdpErasureRequestById(db, tenantId, requestId)
+  return { request: updated!, purgeResult }
 }

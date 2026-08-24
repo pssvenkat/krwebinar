@@ -207,3 +207,32 @@ export interface DbLandingPageSettings {
   updated_at: string
 }
 
+export interface DbConsentRecord {
+  id: string
+  tenant_id: string
+  subject_email: string
+  subject_phone: string | null
+  consent_type: 'necessary' | 'marketing' | 'analytics' | 'contact'
+  granted: number             // 1 = granted, 0 = withdrawn
+  ip_address: string | null
+  user_agent: string | null
+  source_url: string | null
+  legal_basis: string
+  recorded_at: string
+}
+
+export interface DbDpdpErasureRequest {
+  id: string
+  tenant_id: string
+  email: string | null
+  phone: string | null
+  reason: string | null
+  status: 'PENDING' | 'COMPLETED' | 'REJECTED'
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  processed_at: string | null
+  processed_by: string | null
+  resolution_notes: string | null
+}
+
