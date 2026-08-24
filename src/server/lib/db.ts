@@ -2350,39 +2350,7 @@ export async function purgeTenantUserData(
     throw new Error('At least one identifier (email or phone) is required to purge data')
   }
 
-  // 1. Delete feedbacks associated with registrations or attendee email
-  let deletedFeedbacks = 0
-  if (cleanEmail) {
-    const fbRes = await db
-      .prepare('DELETE FROM feedbacks WHERE tenant_id = ? AND LOWER(attendee_email) = ?')
-      .bind(tenantId, cleanEmail)
-      .run()
-    deletedFeedbacks += fbRes.meta?.changes ?? 0
-  }
-
-  // 2. Delete registrations for this tenant
-  let deletedRegistrations = 0
-  if (cleanEmail && cleanPhone) {
-    const regRes = await db
-      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND (LOWER(email) = ? OR phone_e164 = ?)')
-      .bind(tenantId, cleanEmail, cleanPhone)
-      .run()
-    deletedRegistrations = regRes.meta?.changes ?? 0
-  } else if (cleanEmail) {
-    const regRes = await db
-      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND LOWER(email) = ?')
-      .bind(tenantId, cleanEmail)
-      .run()
-    deletedRegistrations = regRes.meta?.changes ?? 0
-  } else if (cleanPhone) {
-    const regRes = await db
-      .prepare('DELETE FROM registrations WHERE tenant_id = ? AND phone_e164 = ?')
-      .bind(tenantId, cleanPhone)
-      .run()
-    deletedRegistrations = regRes.meta?.changes ?? 0
-  }
-
-  // 3. Delete lead captures for this tenant
+  // 1. Delete lead captures & feedback surveys for this tenant
   let deletedLeads = 0
   if (cleanEmail && cleanPhone) {
     const leadRes = await db
@@ -2404,7 +2372,29 @@ export async function purgeTenantUserData(
     deletedLeads = leadRes.meta?.changes ?? 0
   }
 
-  // 4. Delete consent records for this tenant
+  // 2. Delete webinar registrations for this tenant
+  let deletedRegistrations = 0
+  if (cleanEmail && cleanPhone) {
+    const regRes = await db
+      .prepare('DELETE FROM webinar_registrations WHERE tenant_id = ? AND (LOWER(email) = ? OR phone_e164 = ?)')
+      .bind(tenantId, cleanEmail, cleanPhone)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  } else if (cleanEmail) {
+    const regRes = await db
+      .prepare('DELETE FROM webinar_registrations WHERE tenant_id = ? AND LOWER(email) = ?')
+      .bind(tenantId, cleanEmail)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  } else if (cleanPhone) {
+    const regRes = await db
+      .prepare('DELETE FROM webinar_registrations WHERE tenant_id = ? AND phone_e164 = ?')
+      .bind(tenantId, cleanPhone)
+      .run()
+    deletedRegistrations = regRes.meta?.changes ?? 0
+  }
+
+  // 3. Delete consent records for this tenant
   let deletedConsents = 0
   if (cleanEmail && cleanPhone) {
     const conRes = await db
@@ -2426,7 +2416,8 @@ export async function purgeTenantUserData(
     deletedConsents = conRes.meta?.changes ?? 0
   }
 
-  const totalDeleted = deletedRegistrations + deletedLeads + deletedFeedbacks + deletedConsents
+  const deletedFeedbacks = 0
+  const totalDeleted = deletedRegistrations + deletedLeads + deletedConsents
 
   return {
     email: cleanEmail ?? undefined,
