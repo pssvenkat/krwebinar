@@ -13,9 +13,10 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import RequireAuth from './components/RequireAuth'
 
 // Phase 4: Registration flow (lazy-loaded)
-const RegisterPage   = lazy(() => import('./pages/public/RegisterPage'))
-const AttendPage     = lazy(() => import('./pages/attend/AttendPage'))
-const FeedbackPage   = lazy(() => import('./pages/public/FeedbackPage'))
+const WebinarLandingPage      = lazy(() => import('./pages/public/WebinarLandingPage'))
+const RegisterPage            = lazy(() => import('./pages/public/RegisterPage'))
+const AttendPage              = lazy(() => import('./pages/attend/AttendPage'))
+const FeedbackPage            = lazy(() => import('./pages/public/FeedbackPage'))
 
 // Phase 5: Admin pages (lazy-loaded)
 const AdminLoginPage             = lazy(() => import('./pages/admin/AdminLoginPage'))
@@ -28,7 +29,8 @@ const AdminLeadsPage             = lazy(() => import('./pages/admin/AdminLeadsPa
 // Phase 9: Analytics pages (lazy-loaded)
 const AdminAnalyticsPage         = lazy(() => import('./pages/admin/AdminAnalyticsPage'))
 const AdminWebinarAnalyticsPage  = lazy(() => import('./pages/admin/AdminWebinarAnalyticsPage'))
-// Phase 10: Branding page (lazy-loaded)
+// Phase 10: Branding & Trainer pages (lazy-loaded)
+const AdminTrainerPage           = lazy(() => import('./pages/admin/AdminTrainerPage'))
 const AdminBrandingPage          = lazy(() => import('./pages/admin/AdminBrandingPage'))
 const AdminProfilePage           = lazy(() => import('./pages/admin/AdminProfilePage'))
 const AdminPrivacyPage           = lazy(() => import('./pages/admin/AdminPrivacyPage'))
@@ -66,9 +68,13 @@ export default function App() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           {/* ── Public routes ── */}
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<WebinarLandingPage />} />
+          <Route path="/landing" element={<WebinarLandingPage />} />
+          <Route path="/landing/:id" element={<WebinarLandingPage />} />
+          <Route path="/home" element={<HomePage />} />
 
-          {/* ── Phase 4: Registration flow ── */}
+          {/* ── Registration flow ── */}
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/register/:webinarId" element={<RegisterPage />} />
           <Route path="/w/:token" element={<AttendPage />} />
           <Route path="/attend/:token" element={<AttendPage />} />
@@ -99,6 +105,7 @@ export default function App() {
             <Route path="leads" element={<AdminLeadsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="users" element={<AdminUsersPage />} />
+            <Route path="trainer" element={<AdminTrainerPage />} />
             <Route path="profile" element={<AdminProfilePage />} />
             <Route path="branding" element={<AdminBrandingPage />} />
             <Route path="domains" element={<AdminDomainsPage />} />

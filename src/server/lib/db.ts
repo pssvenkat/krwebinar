@@ -968,6 +968,173 @@ export async function getPublicBranding(
   }
 }
 
+// ── Trainer Profile Helpers ───────────────────────────────────────
+
+export interface TrainerProfileData {
+  name: string
+  title: string
+  bio: string
+  avatar_url: string | null
+  highlights: string[]
+  experience_years: string
+  whatsapp_community_url: string | null
+  social_links: Record<string, string>
+}
+
+export const DEFAULT_TRAINER_PROFILE: TrainerProfileData = {
+  name: 'Shanthi Ramakrishnamurthy',
+  title: 'Lead Trainer & Microgreens Specialist, Krave Microgreens',
+  bio: 'Shanthi is a passionate urban farming advocate and lead trainer at Krave Microgreens, helping home growers turn small balcony spaces into thriving, profitable microgreens businesses.',
+  avatar_url: null,
+  highlights: [
+    '2,000+ students trained',
+    'Microgreens Pioneer in Coimbatore',
+    'Hands-on Commercial & Home Setup Expert',
+  ],
+  experience_years: '8+ Years Experience',
+  whatsapp_community_url: 'https://chat.whatsapp.com/krave-community',
+  social_links: { website: 'https://kravemicrogreens.in' },
+}
+
+export async function ensureTrainerProfileTable(db: D1Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS trainer_profiles (
+      id                      TEXT PRIMARY KEY,
+      tenant_id               TEXT NOT NULL UNIQUE REFERENCES tenants (id) ON DELETE CASCADE,
+      name                    TEXT NOT NULL,
+      title                   TEXT,
+      bio                     TEXT,
+      avatar_url              TEXT,
+      highlights              TEXT NOT NULL DEFAULT '[]',
+      experience_years        TEXT,
+      whatsapp_community_url  TEXT,
+      social_links            TEXT NOT NULL DEFAULT '{}',
+      updated_at              DATETIME NOT NULL DEFAULT (datetime('now'))
+    );
+  `).catch(() => {})
+}
+
+export async function getTrainerProfile(db: D1Database, tenantId: string): Promise<TrainerProfileData> {
+  try {
+    const row = await db
+      .prepare('SELECT * FROM trainer_profiles WHERE tenant_id = ? LIMIT 1')
+      .bind(tenantId)
+      .first<any>()
+
+    if (!row) {
+      return DEFAULT_TRAINER_PROFILE
+    }
+
+    let parsedHighlights: string[] = []
+    try {
+      parsedHighlights = typeof row.highlights === 'string' ? JSON.parse(row.highlights) : (row.highlights || [])
+    } catch {
+      parsedHighlights = DEFAULT_TRAINER_PROFILE.highlights
+    }
+
+    let parsedSocial: Record<string, string> = {}
+    try {
+      parsedSocial = typeof row.social_links === 'string' ? JSON.parse(row.social_links) : (row.social_links || {})
+    } catch {
+      parsedSocial = DEFAULT_TRAINER_PROFILE.social_links
+    }
+
+    return {
+      name: row.name || DEFAULT_TRAINER_PROFILE.name,
+      title: row.title || DEFAULT_TRAINER_PROFILE.title,
+      bio: row.bio || DEFAULT_TRAINER_PROFILE.bio,
+      avatar_url: row.avatar_url || null,
+      highlights: Array.isArray(parsedHighlights) && parsedHighlights.length > 0 ? parsedHighlights : DEFAULT_TRAINER_PROFILE.highlights,
+      experience_years: row.experience_years || DEFAULT_TRAINER_PROFILE.experience_years,
+      whatsapp_community_url: row.whatsapp_community_url || DEFAULT_TRAINER_PROFILE.whatsapp_community_url,
+      social_links: parsedSocial,
+    }
+  } catch {
+    return DEFAULT_TRAINER_PROFILE
+  }
+}
+
+export async function upsertTrainerProfile(
+  db: D1Database,
+  tenantId: string,
+  profile: Partial<TrainerProfileData>,
+): Promise<TrainerProfileData> {
+  await ensureTrainerProfileTable(db)
+  const current = await getTrainerProfile(db, tenantId)
+  const merged: TrainerProfileData = {
+    name: profile.name !== undefined ? profile.name : current.name,
+    title: profile.title !== undefined ? profile.title : current.title,
+    bio: profile.bio !== undefined ? profile.bio : current.bio,
+    avatar_url: profile.avatar_url !== undefined ? profile.avatar_url : current.avatar_url,
+    highlights: profile.highlights !== undefined ? profile.highlights : current.highlights,
+    experience_years: profile.experience_years !== undefined ? profile.experience_years : current.experience_years,
+    whatsapp_community_url: profile.whatsapp_community_url !== undefined ? profile.whatsapp_community_url : current.whatsapp_community_url,
+    social_links: profile.social_links !== undefined ? profile.social_links : current.social_links,
+  }
+
+  const id = generateULID()
+  await db
+    .prepare(`
+      INSERT INTO trainer_profiles (
+        id, tenant_id, name, title, bio, avatar_url,
+        highlights, experience_years, whatsapp_community_url, social_links, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(tenant_id) DO UPDATE SET
+        name = excluded.name,
+        title = excluded.title,
+        bio = excluded.bio,
+        avatar_url = excluded.avatar_url,
+        highlights = excluded.highlights,
+        experience_years = excluded.experience_years,
+        whatsapp_community_url = excluded.whatsapp_community_url,
+        social_links = excluded.social_links,
+        updated_at = datetime('now')
+    `)
+    .bind(
+      id,
+      tenantId,
+      merged.name,
+      merged.title,
+      merged.bio,
+      merged.avatar_url,
+      JSON.stringify(merged.highlights),
+      merged.experience_years,
+      merged.whatsapp_community_url,
+      JSON.stringify(merged.social_links),
+    )
+    .run()
+
+  return merged
+}
+
+export async function getPublicFeaturedWebinar(db: D1Database, tenantId: string): Promise<DbWebinar | null> {
+  // 1. Look for a currently LIVE webinar
+  let webinar = await db
+    .prepare("SELECT * FROM webinars WHERE tenant_id = ? AND status = 'LIVE' ORDER BY updated_at DESC LIMIT 1")
+    .bind(tenantId)
+    .first<DbWebinar>()
+
+  // 2. Look for the next upcoming PUBLISHED webinar
+  if (!webinar) {
+    webinar = await db
+      .prepare(
+        "SELECT * FROM webinars WHERE tenant_id = ? AND status = 'PUBLISHED' AND registration_open = 1 ORDER BY start_date ASC, start_time ASC LIMIT 1",
+      )
+      .bind(tenantId)
+      .first<DbWebinar>()
+  }
+
+  // 3. Fallback to any published webinar or latest webinar
+  if (!webinar) {
+    webinar = await db
+      .prepare("SELECT * FROM webinars WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1")
+      .bind(tenantId)
+      .first<DbWebinar>()
+  }
+
+  return webinar ?? null
+}
+
 // ── Phase 11: Leads helpers ───────────────────────────────────────
 
 export interface LeadRow {

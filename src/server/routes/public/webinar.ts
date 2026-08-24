@@ -24,6 +24,8 @@ import {
   countFeedbackForRegistration,
   getWebinarById,
   getTenantSettings,
+  getPublicFeaturedWebinar,
+  getTrainerProfile,
 } from '../../lib/db'
 import { generateSecureToken } from '../../lib/jwt'
 import type { Env, HonoVariables } from '../../types'
@@ -51,6 +53,39 @@ function serializePublicWebinar(w: Awaited<ReturnType<typeof getPublicWebinar>>)
     youtubeVideoId: w.status === 'LIVE' ? null : null,
   }
 }
+
+// ── GET /webinars/featured (Public Landing Page data) ──────────────
+
+publicWebinarRoutes.get('/featured', async (c) => {
+  const tenant = c.get('tenant')
+  const [webinar, trainer] = await Promise.all([
+    getPublicFeaturedWebinar(c.env.DB, tenant.id),
+    getTrainerProfile(c.env.DB, tenant.id),
+  ])
+
+  let spotsLeft = 300
+  let isFull = false
+
+  if (webinar) {
+    const registered = await countRegistrations(c.env.DB, tenant.id, webinar.id)
+    spotsLeft = Math.max(0, webinar.max_participants - registered)
+    isFull = spotsLeft === 0
+  }
+
+  return c.json({
+    ok: true,
+    data: {
+      webinar: webinar
+        ? {
+            ...serializePublicWebinar(webinar),
+            spotsLeft,
+            isFull,
+          }
+        : null,
+      trainer,
+    },
+  })
+})
 
 // ── GET /webinars/:id/public ──────────────────────────────────────
 

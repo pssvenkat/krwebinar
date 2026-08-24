@@ -8,6 +8,7 @@ import { webinarAdminRoutes } from './routes/admin/webinars'
 import { registrationAdminRoutes } from './routes/admin/registrations'
 import { analyticsRoutes } from './routes/admin/analytics'
 import { brandingRoutes } from './routes/admin/branding'
+import { trainerRoutes } from './routes/admin/trainer'
 import { leadsRoutes } from './routes/admin/leads'
 import { domainRoutes } from './routes/admin/domains'
 import { adminUserRoutes } from './routes/admin/users'
@@ -86,6 +87,8 @@ app.route('/api/v1/admin/registrations', registrationAdminRoutes)
 app.route('/api/v1/admin', analyticsRoutes)
 app.route('/api/v1/admin', brandingRoutes)
 app.route('/api/v1', brandingRoutes)    // serves /api/v1/public/branding (no auth)
+app.route('/api/v1/admin', trainerRoutes)
+app.route('/api/v1', trainerRoutes)     // serves /api/v1/public/trainer (no auth)
 app.route('/api/v1/admin', leadsRoutes)
 app.route('/api/v1/admin/domains', domainRoutes)
 app.route('/api/v1/admin/users', adminUserRoutes)

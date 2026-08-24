@@ -97,10 +97,12 @@ export default function AdminLayout() {
             <AdminNavLink to="/admin/analytics">📈 Analytics</AdminNavLink>
           </NavGroup>
           <NavGroup label="Organization">
-            <AdminNavLink to="/admin/users">👥 Team & Users</AdminNavLink>
+            <AdminNavLink to="/admin/trainer">🎙️ Trainer Profile</AdminNavLink>
+            <AdminNavLink to="/admin/branding">🎨 Branding &amp; Theme</AdminNavLink>
+            <AdminNavLink to="/admin/domains">🌐 Custom Domains</AdminNavLink>
             <AdminNavLink to="/admin/profile">🏢 Business Profile</AdminNavLink>
-            <AdminNavLink to="/admin/branding">🎨 Branding</AdminNavLink>
-            <AdminNavLink to="/admin/privacy">🔒 Privacy & DPDP</AdminNavLink>
+            <AdminNavLink to="/admin/users">👥 Team &amp; Users</AdminNavLink>
+            <AdminNavLink to="/admin/privacy">🔒 Privacy &amp; DPDP</AdminNavLink>
           </NavGroup>
         </nav>
 

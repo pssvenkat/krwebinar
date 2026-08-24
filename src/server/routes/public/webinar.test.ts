@@ -49,6 +49,8 @@ import {
   markAttended,
   countFeedbackForRegistration,
   getWebinarById,
+  getPublicFeaturedWebinar,
+  getTrainerProfile,
 } from '../../lib/db'
 
 // ── Test helpers ──────────────────────────────────────────────────
@@ -422,5 +424,35 @@ describe('POST /attend/verify-phone', () => {
     const body = await res.json() as { ok: boolean; error: { code: string } }
     expect(body.ok).toBe(false)
     expect(body.error.code).toBe('NOT_REGISTERED')
+  })
+
+  it('GET /featured returns featured webinar and trainer data', async () => {
+    vi.mocked(getPublicFeaturedWebinar).mockResolvedValueOnce(MOCK_WEBINAR)
+    vi.mocked(countRegistrations).mockResolvedValueOnce(50)
+    vi.mocked(getTrainerProfile).mockResolvedValueOnce({
+      name: 'Shanthi Ramakrishnamurthy',
+      title: 'Lead Trainer',
+      bio: 'Farming expert',
+      avatar_url: null,
+      highlights: ['2,000+ students'],
+      experience_years: '8+ Years',
+      whatsapp_community_url: 'https://chat.whatsapp.com/test',
+      social_links: {},
+    })
+
+    const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>()
+    app.use('*', async (c, next) => {
+      c.set('tenant', TENANT_CTX)
+      await next()
+    })
+    app.route('/', publicWebinarRoutes)
+
+    const res = await app.fetch(new Request('http://localhost/featured'), MOCK_ENV, MOCK_CTX)
+    expect(res.status).toBe(200)
+    const body = await res.json() as any
+    expect(body.ok).toBe(true)
+    expect(body.data.webinar.title).toBe('Microgreens 101')
+    expect(body.data.webinar.spotsLeft).toBe(100)
+    expect(body.data.trainer.name).toBe('Shanthi Ramakrishnamurthy')
   })
 })

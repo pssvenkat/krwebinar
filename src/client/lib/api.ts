@@ -183,6 +183,22 @@ export const api = {
     update: (data: Partial<SettingsData>) => _fetch<{ settings: SettingsData }>('/admin/settings', { method: 'PUT', body: data }),
   },
 
+  // Trainer Profile
+  trainer: {
+    get: () => _fetch<TrainerProfile>('/admin/trainer'),
+    update: (data: Partial<TrainerProfile>) => _fetch<TrainerProfile>('/admin/trainer', { method: 'PUT', body: data }),
+    getPublic: () => _fetch<TrainerProfile>('/public/trainer'),
+  },
+
+  // Public Landing Page Data
+  landing: {
+    getFeatured: () =>
+      _fetch<{
+        webinar: (WebinarSummary & { spotsLeft: number; isFull: boolean; description: string | null; isLive: boolean }) | null
+        trainer: TrainerProfile
+      }>('/public/webinars/featured'),
+  },
+
   // Custom Domains
   domains: {
     list: () => _fetch<{ domains: TenantDomain[]; instructions: DomainInstructions }>('/admin/domains'),
@@ -315,6 +331,17 @@ export interface BrandingData {
   font_body: string
   logo_url: string | null
   favicon_url: string | null
+}
+
+export interface TrainerProfile {
+  name: string
+  title: string
+  bio: string
+  avatar_url: string | null
+  highlights: string[]
+  experience_years: string
+  whatsapp_community_url: string | null
+  social_links?: Record<string, string>
 }
 
 export interface SettingsData {

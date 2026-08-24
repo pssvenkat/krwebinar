@@ -200,6 +200,7 @@ function SuccessScreen({ registration, webinar, alreadyRegistered }: {
 // ── Webinar type ──────────────────────────────────────────────────
 
 interface WebinarPublicData {
+  id?: string
   title: string; description: string | null; hostName: string
   startDate: string; startTime: string; endTime: string; timezone: string
   spotsLeft: number; isFull: boolean; status: string; registrationOpen: boolean
@@ -208,7 +209,7 @@ interface WebinarPublicData {
 // ── Main RegisterPage ─────────────────────────────────────────────
 
 export default function RegisterPage() {
-  const { webinarId } = useParams<{ webinarId: string }>()
+  const { webinarId } = useParams<{ webinarId?: string }>()
   const { data: branding } = useBranding()
 
   const [formData, setFormData] = useState<FormData>({
@@ -223,24 +224,29 @@ export default function RegisterPage() {
   // ── Fetch public webinar info ─────────────────────────────────
 
   const { data: webinarData, isLoading, error } = useQuery({
-    queryKey: ['public-webinar', webinarId],
+    queryKey: ['public-webinar', webinarId || 'featured'],
     queryFn: async (): Promise<WebinarPublicData> => {
-      const r = await fetch(`/api/v1/webinars/${webinarId}/public`, {
+      const endpoint = webinarId
+        ? `/api/v1/webinars/${webinarId}/public`
+        : `/api/v1/public/webinars/featured`
+      const r = await fetch(endpoint, {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       })
       const json = await r.json() as { ok: boolean; data?: { webinar: WebinarPublicData }; error?: { message: string } }
-      if (!json.ok) throw new Error(json.error?.message ?? 'Webinar not found')
-      return json.data!.webinar
+      if (!json.ok || !json.data?.webinar) throw new Error(json.error?.message ?? 'Webinar not found or registration unavailable')
+      return json.data.webinar
     },
-    enabled: !!webinarId,
   })
+
+  const activeWebinarId = webinarId || webinarData?.id
 
   // ── Registration mutation ─────────────────────────────────────
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const r = await fetch(`/api/v1/webinars/${webinarId}/register`, {
+      if (!activeWebinarId) throw new Error('Webinar ID is missing')
+      const r = await fetch(`/api/v1/webinars/${activeWebinarId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

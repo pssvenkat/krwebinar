@@ -173,3 +173,17 @@ export interface DbLeadCapture {
   created_at: string
 }
 
+export interface DbTrainerProfile {
+  id: string
+  tenant_id: string
+  name: string
+  title: string | null
+  bio: string | null
+  avatar_url: string | null
+  highlights: string        // JSON array of strings
+  experience_years: string | null
+  whatsapp_community_url: string | null
+  social_links: string      // JSON object
+  updated_at: string
+}
+
